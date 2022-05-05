@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Ruga\Skeleton\Test;
+namespace Ruga\Db\Test;
 
 use Laminas\ServiceManager\ServiceManager;
 
