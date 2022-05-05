@@ -5,12 +5,21 @@
   "homepage": "https://github.com/rugalib",
   "type": "library",
   "require": {
-    "php": "^7.4"
+    "php": "^7.4",
+    "ext-json": "*",
+    "psr/container": "^1.0",
+    "psr/http-message": "^1.0",
+    "laminas/laminas-db": "*",
+    "laminas/laminas-config-aggregator": "*",
+    "laminas/laminas-servicemanager": "*",
+    "laminas/laminas-cache": "^2.9",
+    "laminas/laminas-serializer": "^2.9",
+    "rugalib/ruga-log": "*"
   },
   "require-dev": {
-    "phpunit/phpunit": "^9",
-    "laminas/laminas-config-aggregator": "^1",
-    "laminas/laminas-servicemanager": "^3"
+    "ext-bcmath": "*",
+    "ext-pdo": "*",
+    "phpunit/phpunit": "^9"
   },
   "repositories": [
     {"type": "vcs", "url": "https://github.com/rugalib/ruga-std.git"},
