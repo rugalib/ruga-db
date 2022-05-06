@@ -27,7 +27,7 @@ abstract class AbstractTestSetUp extends TestCase
     
     
     
-    protected function setUp()
+    protected function setUp(): void
     {
         $adapter = new \Ruga\Db\Adapter\Adapter($this->getConfig()['db']);
         
