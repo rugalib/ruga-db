@@ -5,7 +5,6 @@ declare(strict_types=1);
 
 namespace Ruga\Db\PHPUnit;
 
-use Laminas\Db\Metadata\Source\Factory;
 use Laminas\ServiceManager\ServiceManager;
 use PHPUnit\Framework\TestCase;
 use Ruga\Db\Adapter\Adapter;
@@ -31,7 +30,7 @@ abstract class AbstractTestSetUp extends TestCase
     {
         $adapter = new \Ruga\Db\Adapter\Adapter($this->getConfig()['db']);
         
-        $metadata = Factory::createSourceFromAdapter($adapter);
+        $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
         
         if (empty($metadata->getTableNames()) && empty($metadata->getViewNames()) && empty(
             $metadata->getTriggerNames()

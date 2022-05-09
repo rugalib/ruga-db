@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Ruga\Db\Adapter;
 
+use Laminas\Db\ResultSet;
+use Ruga\Db\Adapter\Exception\QueryRuntimeException;
 use Ruga\Db\Adapter\Exception\TableManagerMissingException;
 use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\RowInterface;
@@ -116,4 +118,21 @@ class Adapter extends \Laminas\Db\Adapter\Adapter implements AdapterInterface
         }
         return $this->dbhash;
     }
+    
+    
+    
+    public function query(
+        $sql,
+        $parametersOrQueryMode = \Laminas\Db\Adapter\Adapter::QUERY_MODE_PREPARE,
+        ?ResultSet\ResultSetInterface $resultPrototype = null
+    ) {
+        try {
+            return \Laminas\Db\Adapter\Adapter::query($sql, $parametersOrQueryMode, $resultPrototype);
+        } catch (\Throwable $e) {
+            /** @var $e \PDOException */
+//            var_dump($e->errorInfo);
+            throw new QueryRuntimeException("Error executing query: '{$e->getMessage()}'", 0, $e, $sql);
+        }
+    }
+    
 }

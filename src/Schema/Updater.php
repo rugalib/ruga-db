@@ -27,7 +27,9 @@ abstract class Updater
      */
     const TBL_OPTION = 'ruga_option';
     const TBL_FIELD_OPTNAME = 'optname';
+    const TBL_LENGTH_OPTNAME = 200;
     const TBL_FIELD_OPTVALUE = 'optvalue';
+    const TBL_LENGTH_OPTVALUE = 500;
     const TBL_OPTNAME_DBVERSION = 'dbversion';
     const TBL_OPTNAME_DBHASH = 'dbhash';
     const TBL_OPTNAME_DBTAG = 'dbtag';
@@ -290,7 +292,7 @@ abstract class Updater
     {
         // Get meta data object
         $metadata = Factory::createSourceFromAdapter($adapter);
-        $conf_dbtag = $config[Updater::class]['dbtag'] ?? null;
+        $conf_dbtag = $config[Updater::class][Updater::CONF_DBTAG] ?? null;
         
         // Check if option table exists
         if (!in_array(static::TBL_OPTION, $metadata->getTableNames())) {
@@ -306,8 +308,8 @@ abstract class Updater
                 \Ruga\Log\Severity::WARNING
             );
             $table = new Ddl\CreateTable(static::TBL_OPTION);
-            $table->addColumn(new Column\Varchar(static::TBL_FIELD_OPTNAME, 255));
-            $table->addColumn(new Column\Varchar(static::TBL_FIELD_OPTVALUE, 255, true));
+            $table->addColumn(new Column\Varchar(static::TBL_FIELD_OPTNAME, static::TBL_LENGTH_OPTNAME));
+            $table->addColumn(new Column\Varchar(static::TBL_FIELD_OPTVALUE, static::TBL_LENGTH_OPTVALUE, true));
             $table->addConstraint(new Constraint\PrimaryKey(static::TBL_FIELD_OPTNAME));
             $adapter->query($table->getSqlString($adapter->getPlatform()), Adapter::QUERY_MODE_EXECUTE);
             
@@ -317,7 +319,7 @@ abstract class Updater
             }
             
             // Set dbtag
-            if (isset($config[Updater::class]['dbtag'])) {
+            if (isset($config[Updater::class][Updater::CONF_DBTAG])) {
                 static::setDbTag($adapter, $conf_dbtag);
             }
         }
@@ -383,7 +385,7 @@ abstract class Updater
             
             $data = [
                 'comp_name' => $comp_name,
-                'resolver' => static::getResolver(),
+                'resolver' => static::getResolver($adapter), //TODO: Where is $config?
             ];
             
             $aSql = (function ($dbversionfile, $data) {

@@ -10,4 +10,5 @@ interface AdapterInterface extends \Laminas\Db\Adapter\AdapterInterface
 {
     public function tableFactory($table);
     public function rowFactory($id, $ref_table=null);
+    
 }

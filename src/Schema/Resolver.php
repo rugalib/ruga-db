@@ -25,8 +25,18 @@ class Resolver
      */
     public function __construct($adapter, $config)
     {
-        $this->config = $config;
+        $this->config = $config['db'] ?? $config ?? [];
         $this->adapter = $adapter;
+        
+        foreach ($this->config[Updater::class][Updater::CONF_TABLES] ?? [] as $name => $class) {
+            if (!isset($this->tables[$class])) {
+                $this->tables[$class] = $class;
+            }
+            if (!isset($this->tables[$name])) {
+                $this->tables[$name] = $class;
+            }
+        }
+        
         foreach (($this->config[Updater::class]['components'] ?? []) as $component => $component_config) {
             foreach ($component_config[Updater::CONF_TABLES] ?? [] as $name => $class) {
                 if (!isset($this->tables[$class]) || ($component == $class)) {

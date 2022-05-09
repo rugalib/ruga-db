@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Ruga\Row\Feature;
+namespace Ruga\Db\Row\Feature;
 
 use Ruga\Db\Row\Exception\InvalidArgumentException;
 use Ruga\Db\Row\Exception\ReadonlyArgumentException;
