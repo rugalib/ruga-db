@@ -16,7 +16,7 @@ return [
             \Ruga\Db\Schema\Updater::CONF_SCHEMA_DIRECTORY => __DIR__ . '/ruga-dbschema',
             \Ruga\Db\Schema\Updater::CONF_TABLES => [
                 'MemberTable' => \Ruga\Db\Test\Model\MemberTable::class,
-//                \Ruga\Db\Test\Model\MetaTable::class,
+                \Ruga\Db\Test\Model\MetaTable::class,
             ]
         ],
     ],

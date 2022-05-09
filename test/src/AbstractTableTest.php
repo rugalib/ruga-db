@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Ruga\Db\Test;
 
+use Laminas\Db\TableGateway\Feature\GlobalAdapterFeature;
+
 /**
  * @author Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
  */
@@ -87,5 +89,21 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         
         echo $row->uniqueid;
     }
+    
+    
+    
+    public function testCanCreateRowWithFactory()
+    {
+        GlobalAdapterFeature::setStaticAdapter($this->getAdapter());
+        
+        $row = \Ruga\Db\Test\Model\MetaTable::factory(6);
+        echo ($row->data) . PHP_EOL;
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Meta::class, $row);
+        
+        $row = \Ruga\Db\Test\Model\MetaTable::factory('2@MemberTable');
+        echo ($row->fullname) . PHP_EOL;
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Member::class, $row);
+    }
+    
     
 }
