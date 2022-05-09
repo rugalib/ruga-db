@@ -74,7 +74,7 @@ class FullnameTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     
     
-    public function testCanSaveRowInMemberRrlib()
+    public function testCanSaveRowInMemberRuga()
     {
         $t = new \Ruga\Db\Test\Model\MemberRugaTable($this->getAdapter());
         /** @var \Ruga\Db\Test\Model\MemberRuga $row */
