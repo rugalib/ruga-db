@@ -28,7 +28,7 @@ class UpdaterTest extends TestCase
      *
      * @return array
      */
-    protected function getConfig()
+    protected function getConfig(): array
     {
         if (!$this->config) {
             $config = new ConfigAggregator(

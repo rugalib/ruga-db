@@ -395,9 +395,9 @@ abstract class Updater
                     ob_start();
                     $aSql = include $dbversionfile;
                     $str = trim(ob_get_contents());
-                    if (!empty($str)) {
-                        \Ruga\Log::log_msg($str);
-                    }
+//                    if (!empty($str)) {
+//                        \Ruga\Log::log_msg($str);
+//                    }
                     return $aSql;
                 } catch (\Throwable $e) {
                     \Ruga\Log::addLog($e);
@@ -444,10 +444,15 @@ abstract class Updater
                 );
             $sql .= "{$s->getSqlString($adapter->getPlatform())};\n";
             
+//            \Ruga\Log::addLog(
+//                "Updating database " . (empty($comp_name) ? '' : "(component {$comp_name}) ") . "version {$dbversion} to " . ($dbversion + 1) . ": {$sql}",
+//                \Ruga\Log\Severity::DEBUG
+//            );
             \Ruga\Log::addLog(
-                "Updating database " . (empty($comp_name) ? '' : "(component {$comp_name}) ") . "version {$dbversion} to " . ($dbversion + 1) . ": {$sql}",
+                "Updating database " . (empty($comp_name) ? '' : "(component {$comp_name}) ") . "version {$dbversion} to " . ($dbversion + 1),
                 \Ruga\Log\Severity::DEBUG
             );
+
 
 //            $fn="output_" . str_replace(['/', "\\"], '_', $comp_name) . "_" . sprintf("%06u", $dbversion) . ".sql";
 //            file_put_contents($fn, $sql . PHP_EOL . print_r(sys_get_temp_dir(), true));

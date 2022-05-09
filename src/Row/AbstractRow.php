@@ -419,6 +419,28 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      *
      * @return string
      */
+    private function offsetSet_timestamp($offset, $value): string
+    {
+        if (is_a($value, \DateTime::class)) {
+            $value = $value->format('Y-m-d H:i:s');
+        } elseif (is_a($value, \DateTimeImmutable::class)) {
+            $value = $value->format('Y-m-d H:i:s');
+        } elseif (is_a($value, "Zend_Date")) {
+            $value = $value->toString('YYYY-MM-dd HH:mm:ss');
+        }
+        return $value;
+    }
+    
+    
+    
+    /**
+     * Convert various date/time objects to database string.
+     *
+     * @param $offset string Name of the column
+     * @param $value  mixed Value to set the column to
+     *
+     * @return string
+     */
     private function offsetSet_date($offset, $value): string
     {
         if (is_a($value, \DateTime::class)) {
