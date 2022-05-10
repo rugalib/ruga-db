@@ -94,8 +94,9 @@ abstract class AbstractTestSetUp extends TestCase
     
     
     /**
-     * Return the adapter.
+     * Return the adapter. Adapter is created by AdapterFactory.
      *
+     * @see AdapterFactory
      * @return Adapter
      */
     public function getAdapter(): Adapter

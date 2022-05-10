@@ -11,7 +11,7 @@ use Ruga\Db\Adapter\AdapterInterface;
 class AbstractTableFactory implements AbstractFactoryInterface
 {
     
-    public function __invoke(ContainerInterface $container, $requestedName, array $options = null): TableInterface
+    public function __invoke(ContainerInterface $container, $requestedName, ?array $options = null): TableInterface
     {
         return new $requestedName($container->get(AdapterInterface::class));
     }
