@@ -61,4 +61,13 @@ class AbstractRowTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
+    public function testCannotWriteReadonlyAttributeWithSet(): void
+    {
+        $t = new \Ruga\Db\Test\Model\MemberRugaTable($this->getAdapter());
+        $row = $t->createRow();
+        $this->expectException(\Ruga\Db\Row\Exception\ReadonlyArgumentException::class);
+        $row->fullname = 'Hallo Welt';
+    }
+    
 }
