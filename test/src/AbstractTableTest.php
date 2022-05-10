@@ -97,11 +97,11 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         GlobalAdapterFeature::setStaticAdapter($this->getAdapter());
         
         $row = \Ruga\Db\Test\Model\MetaTable::factory(6);
-        echo ($row->data) . PHP_EOL;
+        echo "{$row->data}" . PHP_EOL;
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Meta::class, $row);
         
         $row = \Ruga\Db\Test\Model\MetaTable::factory('2@MemberTable');
-        echo ($row->fullname) . PHP_EOL;
+        echo "{$row->fullname}" . PHP_EOL;
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Member::class, $row);
     }
     
@@ -120,6 +120,135 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     {
         $t = new \Ruga\Db\Test\Model\MetaTable($this->getAdapter());
         $this->assertSame($this->getConfig()['db']['database'], $t->getMetadata()['schema']);
+    }
+    
+    
+    
+    public function testCanFindItemById(): void
+    {
+        $t = new \Ruga\Db\Test\Model\FullnameTable($this->getAdapter());
+        
+        $result = $t->findById(2);
+        
+        foreach ($result as $row) {
+            echo $row->fullname . PHP_EOL;
+            $this->assertInstanceOf(\Ruga\Db\Test\Model\Fullname::class, $row);
+        }
+    }
+    
+    
+    
+    public function testCanFindItemByUniqueid()
+    {
+        $t = new \Ruga\Db\Test\Model\MemberTable($this->getAdapter());
+        
+        $result = $t->findById('2@MemberTable');
+        
+        foreach ($result as $row) {
+            echo $row->fullname . PHP_EOL;
+            $this->assertInstanceOf(\Ruga\Db\Test\Model\Member::class, $row);
+        }
+    }
+    
+    
+    
+    public function testCanFindItemByRow()
+    {
+        $t = new \Ruga\Db\Test\Model\MemberTable($this->getAdapter());
+        
+        $searchRow = $t->findById('2@MemberTable')->current();
+        
+        $result = $t->findById($searchRow);
+        foreach ($result as $row) {
+            echo $row->fullname . PHP_EOL;
+            $this->assertInstanceOf(\Ruga\Db\Test\Model\Member::class, $row);
+        }
+    }
+    
+    
+    
+    public function testCanFindItemsById()
+    {
+        $t = new \Ruga\Db\Test\Model\FullnameTable($this->getAdapter());
+        
+        $result = $t->findById([1, 3, 5, 7]);
+        
+        foreach ($result as $row) {
+            echo $row->fullname . PHP_EOL;
+            $this->assertInstanceOf(\Ruga\Db\Test\Model\Fullname::class, $row);
+        }
+    }
+    
+    
+    
+    public function testCanFindItemsByUniqueid()
+    {
+        $t = new \Ruga\Db\Test\Model\MemberTable($this->getAdapter());
+        
+        $result = $t->findById(['2@MemberTable', '1@MemberTable', '3@Hallo']);
+        
+        foreach ($result as $row) {
+            echo $row->fullname . PHP_EOL;
+            $this->assertInstanceOf(\Ruga\Db\Test\Model\Member::class, $row);
+        }
+    }
+    
+    
+    
+    public function findItems()
+    {
+        $t = new \Ruga\Db\Test\Model\FullnameTable($this->getAdapter());
+        
+        $ids = [1, 3, 5, 7];
+        return $t->findById($ids);
+    }
+    
+    
+    
+    public function testFullnameFeatureReturnsWrongData()
+    {
+        $item_uniqueids1 = array_map(
+            function (\Ruga\Db\Test\Model\Fullname $item) {
+                return "{$item->id}@{$item->type}";
+            },
+            iterator_to_array($this->findItems())
+        );
+        
+        $item_uniqueids2 = array_map(
+            function (\Ruga\Db\Test\Model\Fullname $item) {
+                return "{$item->uniqueid}";
+            },
+            iterator_to_array($this->findItems())
+        );
+        
+        $a = $this->findItems();
+        $b = iterator_to_array($this->findItems());
+        $c = $this->findItems()->toArray();
+        
+        $d = [];
+        $items = $this->findItems();
+        while ($item = $items->current()) {
+            $d[] = $item->uniqueid;
+            $items->next();
+        }
+        
+        
+        print_r($item_uniqueids1);
+        print_r($item_uniqueids2);
+        
+        
+        foreach ($item_uniqueids1 as $key => $item) {
+            $this->assertSame($item, $item_uniqueids2[$key]);
+        }
+    }
+    
+    
+    
+    public function testIteratorToArray()
+    {
+        $b = iterator_to_array($this->findItems());
+        echo $b[0]->uniqueid;
+        $this->assertSame('1@FullnameTable', $b[0]->uniqueid);
     }
     
 }
