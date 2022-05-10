@@ -53,7 +53,7 @@ class CreateChangeFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         unset($row);
         $row = $t->findById(3)->current();
         $this->assertIsString($row->created);
-        $this->assertSame(1, $row->createdBy);
+        $this->assertSame('1', $row->createdBy);
         $this->assertSame('Peter', $row->first_name);
         $this->assertSame('', $row->fullname);
     }

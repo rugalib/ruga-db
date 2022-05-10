@@ -45,8 +45,45 @@ class UpdaterTest extends TestCase
     
     
     
+    protected function clearDb(): void
+    {
+        $adapter = new \Ruga\Db\Adapter\Adapter($this->getConfig()['db']);
+        
+        $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
+        
+        if (empty($metadata->getTableNames()) && empty($metadata->getViewNames()) && empty(
+            $metadata->getTriggerNames()
+            )) {
+            \Ruga\Log::log_msg("Database '{$adapter->getCurrentSchema()}' is empty.");
+        } else {
+            $db_dbtag = Updater::getDbTag($adapter);
+            $conf_dbtag = $this->getConfig()['db'][Updater::class][Updater::CONF_DBTAG];
+            
+            // Check if dbtag in database matches dbtag in config
+            if ($conf_dbtag != $db_dbtag) {
+                throw new \Exception(
+                    "Database '{$adapter->getCurrentSchema()}' dbtag '{$db_dbtag}' does not match the dbtag of this test '{$conf_dbtag}'. NOT DELETING!"
+                );
+            }
+            
+            $query = "SET FOREIGN_KEY_CHECKS = 0;" . PHP_EOL;
+            foreach ($metadata->getTableNames() as $table) {
+                $query .= "DROP TABLE `{$table}`;" . PHP_EOL;
+            }
+            $query .= "SET FOREIGN_KEY_CHECKS = 1;" . PHP_EOL;
+            
+            // Clear the database
+            \Ruga\Log::log_msg("Clearing database '{$adapter->getCurrentSchema()}'");
+            $adapter->query($query, $adapter::QUERY_MODE_EXECUTE);
+        }
+    }
+    
+    
+    
     public function testCanUpdateSchemaWithEmptyConfig(): void
     {
+        $this->clearDb();
+        
         $config = $this->getConfig();
         $config['db'][\Ruga\Db\Schema\Updater::class][\Ruga\Db\Schema\Updater::CONF_REQUESTED_VERSION] = 0;
         
@@ -71,6 +108,8 @@ class UpdaterTest extends TestCase
     
     public function testCanUpdateSchema(): void
     {
+        $this->clearDb();
+        
         $config = $this->getConfig();
 //        $config['db'][\Ruga\Db\Schema\Updater::class][\Ruga\Db\Schema\Updater::CONF_REQUESTED_VERSION] = 0;
         
@@ -81,7 +120,7 @@ class UpdaterTest extends TestCase
             $adapter,
             $config['db']
         );
-    
+        
         $db_dbtag = Updater::getDbTag($adapter);
         echo "Current dbtag: '{$db_dbtag}'" . PHP_EOL;
         $this->assertEquals($config['db'][Updater::class][Updater::CONF_DBTAG], $db_dbtag);
@@ -95,6 +134,8 @@ class UpdaterTest extends TestCase
     
     public function testCanDetectSchemaUpdateFailed()
     {
+        $this->clearDb();
+        
         $config = $this->getConfig();
         $config['db'][\Ruga\Db\Schema\Updater::class][\Ruga\Db\Schema\Updater::CONF_SCHEMA_DIRECTORY] = __DIR__ . '/../config/ruga-dbschema-with-error';
         $config['db'][\Ruga\Db\Schema\Updater::class][\Ruga\Db\Schema\Updater::CONF_REQUESTED_VERSION] = 2;
