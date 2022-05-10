@@ -414,4 +414,18 @@ class AbstractRowTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
+    public function testSaveReturnsInt()
+    {
+        $t = new \Ruga\Db\Test\Model\SimpleTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Simple $row */
+        $row = $t->createRow();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Simple::class, $row);
+        
+        $row->data = 'new data 4';
+        $this->assertSame('new data 4', $row->data);
+        
+        $i = $row->save();
+        $this->assertIsInt($i);
+    }
 }
