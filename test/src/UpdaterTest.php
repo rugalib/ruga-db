@@ -91,4 +91,22 @@ class UpdaterTest extends TestCase
         $this->assertEquals($config['db'][Updater::class][Updater::CONF_REQUESTED_VERSION], $db_version);
     }
     
+    
+    
+    public function testCanDetectSchemaUpdateFailed()
+    {
+        $config = $this->getConfig();
+        $config['db'][\Ruga\Db\Schema\Updater::class][\Ruga\Db\Schema\Updater::CONF_SCHEMA_DIRECTORY] = __DIR__ . '/../config/ruga-dbschema-with-error';
+        $config['db'][\Ruga\Db\Schema\Updater::class][\Ruga\Db\Schema\Updater::CONF_REQUESTED_VERSION] = 2;
+        
+        $adapter = new Adapter($config['db']);
+        $this->assertInstanceOf(AdapterInterface::class, $adapter);
+        
+        $this->expectException(\Ruga\Db\Schema\Exception\SchemaUpdateFailedException::class);
+        \Ruga\Db\Schema\Updater::update(
+            $adapter,
+            $config['db']
+        );
+    }
+    
 }

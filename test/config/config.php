@@ -8,6 +8,7 @@ return [
         'username' => '',
         'password' => '',
         'driver_options' => [
+//            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
 //            \PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'UTF8'"
         ],
         \Ruga\Db\Schema\Updater::class => [
