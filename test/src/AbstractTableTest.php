@@ -31,7 +31,7 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     
     
-    public function testCanCreateRow()
+    public function testCanCreateRow(): void
     {
         $t = new \Ruga\Db\Test\Model\AlltypesTable($this->getAdapter());
         $row = $t->createRow();
@@ -40,7 +40,7 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     
     
-    public function testCanCreateRowAndSave()
+    public function testCanCreateRowAndSave(): void
     {
         $t = new \Ruga\Db\Test\Model\AlltypesTable($this->getAdapter());
         $row = $t->createRow();
@@ -79,7 +79,7 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     
     
-    public function testCanFindRowByUniqueid()
+    public function testCanFindRowByUniqueid(): void
     {
         $t = new \Ruga\Db\Test\Model\AlltypesTable($this->getAdapter());
         $rowset = $t->findById("1@AlltypesTable");
@@ -92,7 +92,7 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     
     
-    public function testCanCreateRowWithFactory()
+    public function testCanCreateRowWithFactory(): void
     {
         GlobalAdapterFeature::setStaticAdapter($this->getAdapter());
         
@@ -105,5 +105,21 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Member::class, $row);
     }
     
+    
+    
+    public function testCannotCreateNonexistentTable(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Table "Nonexistent" does not exist');
+        $t = new \Ruga\Db\Test\Model\MetaNonexistentTable($this->getAdapter());
+    }
+    
+    
+    
+    public function testCanReadSchemaNameFromTable(): void
+    {
+        $t = new \Ruga\Db\Test\Model\MetaTable($this->getAdapter());
+        $this->assertSame($this->getConfig()['db']['database'], $t->getMetadata()['schema']);
+    }
     
 }
