@@ -251,4 +251,22 @@ class AbstractTableTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertSame('1@FullnameTable', $b[0]->uniqueid);
     }
     
+    
+    
+    public function testCustomSqlSelectWithJoin()
+    {
+        $table = new \Ruga\Db\Test\Model\SimpleTenantTable($this->getAdapter());
+        /** @var \Laminas\Db\Sql\Select $select */
+        $select = $table->getSql()->select();
+        $select->join(['m' => \Ruga\Db\Test\Model\MusterTable::TABLENAME], "m.Simple_id={$table->getTable()}.id");
+        
+        echo PHP_EOL;
+        echo $select->getSqlString($this->getAdapter()->getPlatform());
+        echo PHP_EOL;
+        
+        $rowset = $table->selectWith($select);
+        
+        $this->assertInstanceOf(\Ruga\Db\ResultSet\ResultSet::class, $rowset);
+    }
+    
 }
