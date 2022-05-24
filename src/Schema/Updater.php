@@ -453,15 +453,19 @@ abstract class Updater
                 \Ruga\Log\Severity::DEBUG
             );
 
-
-//            $fn="output_" . str_replace(['/', "\\"], '_', $comp_name) . "_" . sprintf("%06u", $dbversion) . ".sql";
-//            file_put_contents($fn, $sql . PHP_EOL . print_r(sys_get_temp_dir(), true));
             $adapter->query($sql)->execute();
             
             $newVersion = static::getDbVersion($adapter, $comp_name);
             if ($newVersion != ($dbversion + 1)) {
+                $fn=sys_get_temp_dir() . DIRECTORY_SEPARATOR . "output_" . str_replace(['/', "\\"], '_', $comp_name) . "_" . sprintf("%06u", $dbversion) . ".sql";
+                file_put_contents($fn, $sql);
+                \Ruga\Log::addLog("Query dumped to: {$fn}", \Ruga\Log\Severity::DEBUG);
+    
                 throw new SchemaUpdateFailedException(
-                    "Error updating data base schema. The query did not return errors but the version was not updated. Version found: {$newVersion} | version expected: " . ($dbversion + 1)
+                    "Error updating data base schema. The query did not return errors but the version was not updated. Version found: {$newVersion} | version expected: " . ($dbversion + 1),
+                    0,
+                    null,
+                    $sql
                 );
             }
         }
