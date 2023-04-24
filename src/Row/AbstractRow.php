@@ -366,10 +366,11 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      */
     public function getFullname(): string
     {
-        return $this->offsetExists('fullname') ? $this->offsetGet('fullname') : ($this->offsetExists(
-            'name'
-        ) ? $this->offsetGet('name') : $this->uniqueid);
-//        return parent::__isset('fullname') ? parent::__get('fullname') : (parent::__isset('name') ? parent::__get('name') : $this->uniqueid);
+        $str=$this->offsetExists('fullname')
+            ? $this->offsetGet('fullname')
+            : ($this->offsetExists('name') ? $this->offsetGet('name') : $this->uniqueid);
+        
+        return "{$str}";
     }
     
     
@@ -848,7 +849,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
                     $metadataFeature->getMetadata()['columns'][$offset]
                 )) {
                 throw new Exception\NoDefaultValueException(
-                    "Column '{$offset}' has no default value in '" . get_class($this) . "'."
+                    "Column '{$offset}' has no default value in '" . get_class($this) . "' (Is DefaultValueFeature loaded in row?)."
                 );
             }
         } else {
