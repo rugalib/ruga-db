@@ -86,6 +86,37 @@ class FeatureSet extends \Laminas\Db\RowGateway\Feature\FeatureSet
     }
     
     
+    public function canCallMagicCall($method)
+    {
+        if (!empty($this->features)) {
+            foreach ($this->features as $feature) {
+                if (method_exists($feature, $method) && is_callable([$feature, $method])) {
+                    return true;
+                }
+            }
+        }
+        return parent::canCallMagicCall($method);
+    }
+    
+    
+    
+    public function callMagicCall($method, $arguments)
+    {
+        if (!empty($this->features)) {
+            foreach ($this->features as $feature) {
+                try {
+                    return call_user_func([$feature, $method], ...$arguments);
+                } catch (\Exception $e) {
+                    if (!($e instanceof InvalidArgumentException)) {
+                        throw $e;
+                    }
+                }
+            }
+        }
+        return parent::callMagicCall($method, $arguments);
+    }
+    
+    
     
     /**
      * Clone all the features.

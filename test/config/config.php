@@ -13,7 +13,7 @@ return [
         ],
         \Ruga\Db\Schema\Updater::class => [
             \Ruga\Db\Schema\Updater::CONF_DBTAG => 'no-dbtag-set',
-            \Ruga\Db\Schema\Updater::CONF_REQUESTED_VERSION => 11,
+            \Ruga\Db\Schema\Updater::CONF_REQUESTED_VERSION => 14,
             \Ruga\Db\Schema\Updater::CONF_SCHEMA_DIRECTORY => __DIR__ . '/ruga-dbschema',
             \Ruga\Db\Schema\Updater::CONF_TABLES => [
                 'MemberTable' => \Ruga\Db\Test\Model\MemberTable::class,

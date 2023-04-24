@@ -356,6 +356,16 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
     
     
     
+    public function __call($name, $arguments)
+    {
+        if ($this->featureSet->canCallMagicCall($name)) {
+            return $this->featureSet->callMagicCall($name, $arguments);
+        }
+        trigger_error('Call to undefined method '.__CLASS__.'::'.$name.'()', E_USER_ERROR);
+    }
+    
+    
+    
     /**
      * Constructs a display name from the given fields.
      *
@@ -540,7 +550,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
         
         if ($isNullable && (($value === null) || ($value === ''))) {
             $value = null;
-        } elseif (is_callable([$this, $subMethodName])) {
+        } elseif (method_exists($this, $subMethodName) && is_callable([$this, $subMethodName])) {
             $value = call_user_func([$this, $subMethodName], $offset, $value);
         }
         
@@ -870,7 +880,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
         }
         
         $subMethodName = "offsetGet_{$data_type}";
-        if (is_callable([$this, $subMethodName])) {
+        if (method_exists($this, $subMethodName) && is_callable([$this, $subMethodName])) {
             return call_user_func([$this, $subMethodName], $offset, $value);
         }
         
