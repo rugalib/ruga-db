@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Ruga\Db\Test;
 
 use Ruga\Db\Adapter\Adapter;
+use Ruga\Db\Test\Model\User;
 
 /**
  * @author Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
@@ -105,6 +106,21 @@ class FullnameTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         );
         $i = $created->diff($changed);
         $this->assertGreaterThanOrEqual(9, $i->s);
+    }
+    
+    
+    
+    public function testNullableFullnameWorks()
+    {
+        require(__DIR__ . '/Model/UserTable.php');
+        require(__DIR__ . '/Model/User.php');
+        $t = new \Ruga\DB\Test\Model\UserTable($this->getAdapter());
+        /** @var User $row */
+        $row = $t->createRow(['username' => 'username']);
+        
+        $row->save();
+        
+        $this->assertIsString($row->getFullname());
     }
     
     
