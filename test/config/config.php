@@ -18,6 +18,8 @@ return [
             \Ruga\Db\Schema\Updater::CONF_TABLES => [
                 'MemberTable' => \Ruga\Db\Test\Model\MemberTable::class,
                 \Ruga\Db\Test\Model\MetaTable::class,
+                'CartTable' => \Ruga\Db\Test\Model\CartTable::class,
+                'CartItemTable' => \Ruga\Db\Test\Model\CartItemTable::class
             ]
         ],
     ],

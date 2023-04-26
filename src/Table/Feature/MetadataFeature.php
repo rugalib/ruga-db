@@ -16,20 +16,14 @@ use Ruga\Db\Table\TableInterface;
 
 class MetadataFeature extends AbstractFeature
 {
-    /**
-     * @var MetadataInterface|null
-     */
-    protected $metadata = null;
+    private ?MetadataInterface $metadata = null;
     
-    /**
-     * @var StorageInterface|null
-     */
-    private $cache;
+    private ?StorageInterface $cache;
     
     /**
      * @var StorageInterface[]
      */
-    private static $defaultCaches = [];
+    private static array $defaultCaches = [];
     
     
     
@@ -118,6 +112,8 @@ class MetadataFeature extends AbstractFeature
 //        $t->schema = $this->sharedData['metadata']['schema'];
         $t->columns = array_keys($this->sharedData['metadata']['columns']);
         
+        
+        
         // get constraint keys
         foreach ($m->getConstraintKeys($table, $schema) as $constraintkey) {
             /** @var $constraintkey \Laminas\Db\Metadata\Object\ConstraintKeyObject */
@@ -140,6 +136,7 @@ class MetadataFeature extends AbstractFeature
             }
             $a = [
                 'NAME' => $constraint->getName(),
+                'TABLE' => $constraint->getTableName(),
                 'TYPE' => $constraint->getType(),
                 'COLUMNS' => $constraint->getColumns(),
                 'REF_SCHEMA' => $constraint->getReferencedTableSchema(),
@@ -149,6 +146,36 @@ class MetadataFeature extends AbstractFeature
             $this->sharedData['metadata']['constraints'][$a['NAME']] = $a;
         }
         
+        
+        /*
+        // TODO: Find better solution
+        $aTableName2ClassName=[];
+        foreach(get_declared_classes() as $classCandidate) {
+            if(is_a($classCandidate, TableInterface::class, true) && ($classCandidate::TABLENAME != '')) {
+                $aTableName2ClassName[$classCandidate::TABLENAME]=$classCandidate;
+            }
+        }
+        
+        // get referencing contraints
+        $this->sharedData['metadata']['constraint_references']=[];
+        foreach($m->getTables() as $schematable) {
+            foreach($schematable->getConstraints() as $constraint) {
+                if($constraint->getReferencedTableName() == $table) {
+                    $a = [
+                        'NAME' => $constraint->getName(),
+                        'TABLE' => $constraint->getTableName(),
+                        'TABLE_CLASS' => $aTableName2ClassName[$constraint->getTableName()] ?? null,
+                        'TYPE' => $constraint->getType(),
+                        'COLUMNS' => $constraint->getColumns(),
+                        'REF_SCHEMA' => $constraint->getReferencedTableSchema(),
+                        'REF_TABLE' => $constraint->getReferencedTableName(),
+                        'REF_COLUMNS' => $constraint->getReferencedColumns(),
+                    ];
+                    $this->sharedData['metadata']['constraint_references'][$constraint->getName()] = $a;
+                }
+            }
+        }
+        */
         
         // get primary key(s)
         // process primary key only if table is a table; there are no PK constraints on views
@@ -184,6 +211,11 @@ class MetadataFeature extends AbstractFeature
         return $this->sharedData['metadata'];
     }
     
+    
+//    public function getMetadataInterface(): MetadataInterface
+//    {
+//        return $this->metadata;
+//    }
     
     
     private function getCache(): StorageInterface
@@ -260,6 +292,6 @@ class MetadataFeature extends AbstractFeature
             static::$defaultCaches[__CLASS__] = $metadataCache;
         }
     }
-    
+ 
     
 }

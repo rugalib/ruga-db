@@ -105,11 +105,11 @@ class FeatureSet extends \Laminas\Db\RowGateway\Feature\FeatureSet
         if (!empty($this->features)) {
             foreach ($this->features as $feature) {
                 try {
-                    return call_user_func([$feature, $method], ...$arguments);
-                } catch (\Exception $e) {
-                    if (!($e instanceof InvalidArgumentException)) {
-                        throw $e;
+                    if(method_exists($feature, $method) && is_callable([$feature, $method])) {
+                        return call_user_func([$feature, $method], ...$arguments);
                     }
+                } catch (\Exception $e) {
+                    throw $e;
                 }
             }
         }

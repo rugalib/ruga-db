@@ -17,17 +17,12 @@ use Ruga\Db\Table\TableInterface;
 abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
                                                          RowInterface /*, ArraySerializableInterface */
 {
-    /**
-     * Reference to the table.
-     *
-     * @var AbstractTable
-     */
-    private $tableGateway;
+    private AbstractTable $tableGateway;
     
     /**
      * @var Feature\FeatureSet
      */
-    protected $featureSet = null;
+//    protected $featureSet = null;
     
     
     
@@ -35,7 +30,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      * Construct the row object. Calls initFeatures() before giving control to parent.
      *
      * @param                $primaryKeyColumn
-     * @param                $table
+     * @param                $tableName
      * @param                $adapterOrSql
      * @param TableInterface $tableGatewayObject
      *
@@ -43,13 +38,13 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      */
     final public function __construct(
         $primaryKeyColumn,
-        $table,
+        $tableName,
         $adapterOrSql,
         TableInterface $tableGatewayObject
     ) {
         $this->tableGateway = $tableGatewayObject;
         $this->featureSet = $this->initFeatures(new FeatureSet());
-        parent::__construct($primaryKeyColumn, $table, $adapterOrSql);
+        parent::__construct($primaryKeyColumn, $tableName, $adapterOrSql);
     }
     
     
@@ -358,7 +353,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
     
     public function __call($name, $arguments)
     {
-        if ($this->featureSet->canCallMagicCall($name)) {
+        if ($this->featureSet && $this->featureSet->canCallMagicCall($name)) {
             return $this->featureSet->callMagicCall($name, $arguments);
         }
         trigger_error('Call to undefined method '.__CLASS__.'::'.$name.'()', E_USER_ERROR);

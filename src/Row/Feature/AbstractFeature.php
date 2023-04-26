@@ -12,7 +12,7 @@ class AbstractFeature extends \Laminas\Db\RowGateway\Feature\AbstractFeature
     /**
      * @var AbstractRow
      */
-    protected $rowGateway = null;
+//    protected $rowGateway = null;
     
     
     

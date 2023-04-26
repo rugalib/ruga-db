@@ -13,8 +13,9 @@ class Cart extends AbstractRugaRow implements CartAttributesInterface, ParentFea
 {
     protected function initFeatures(FeatureSet $featureSet): FeatureSet
     {
+        $featureSet=parent::initFeatures($featureSet);
         $featureSet->addFeature(new ParentFeature());
-        return parent::initFeatures($featureSet);
+        return $featureSet;
     }
     
 }
