@@ -356,7 +356,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
         if ($this->featureSet && $this->featureSet->canCallMagicCall($name)) {
             return $this->featureSet->callMagicCall($name, $arguments);
         }
-        trigger_error('Call to undefined method '.__CLASS__.'::'.$name.'()', E_USER_ERROR);
+        trigger_error('Call to undefined method '.__CLASS__.'::'.$name.'(). Missing feature in ' . get_called_class() . '?', E_USER_ERROR);
     }
     
     

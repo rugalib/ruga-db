@@ -14,6 +14,7 @@ use Ruga\Db\Row\RowInterface;
 use Ruga\Db\Test\Model\CartItemTable;
 use Ruga\Db\Test\Model\CartTable;
 use Ruga\Db\Test\Model\MetaDefaultTable;
+use Ruga\Db\Test\Model\MusterTable;
 use Ruga\Db\Test\Model\SimpleTable;
 
 /**
@@ -148,6 +149,25 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         
         
         $items = $row->findDependentRowset(CartTable::class, 'createdBy');
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+    }
+    
+    
+    public function testCanFindDependentRowsWithManualConstraint()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('5', "{$row->id}");
+        $this->assertSame('data 5', $row->data);
+        
+        
+        $items = $row->findDependentRowset(MusterTable::class);
         /** @var RowInterface $item */
         foreach ($items as $item) {
             print_r($item->idname);

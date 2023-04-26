@@ -7,6 +7,7 @@ namespace Ruga\Db\Test\Model;
 use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\Feature\DefaultValueFeature;
 use Ruga\Db\Row\Feature\FeatureSet;
+use Ruga\Db\Row\Feature\ParentFeature;
 
 class MetaDefault extends AbstractRow implements MetaDefaultAttributesInterface
 {
@@ -19,8 +20,10 @@ class MetaDefault extends AbstractRow implements MetaDefaultAttributesInterface
      */
     protected function initFeatures(FeatureSet $featureSet): FeatureSet
     {
+        $featureSet=parent::initFeatures($featureSet);
         $featureSet->addFeature(new DefaultValueFeature());
-        return parent::initFeatures($featureSet);
+        $featureSet->addFeature(new ParentFeature());
+        return $featureSet;
     }
     
 }
