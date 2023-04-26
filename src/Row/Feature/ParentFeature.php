@@ -71,7 +71,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     }
     
     
-    public function findDependentRowset($dependentTable, $ruleKey = null, ?Select $select = null) /*: ResultSetInterface*/
+    public function findDependentRowset($dependentTable, $ruleKey = null, ?Select $select = null): ResultSetInterface
     {
         /** @var Adapter $adapter */
         $adapter=$this->rowGateway->getTableGateway()->getAdapter();
@@ -90,14 +90,14 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         if($select === null) {
             $select = $dependentTable->getSql()->select();
         } else {
+            // Set table
             $select->from($dependentTable->getTable());
         }
         
+        // save existing where
+        $existingWhere=$select->where;
+        $select->reset(Select::WHERE);
         
-//        $metadataFeature=$dependentTable->getFeatureSet()->getFeatureByClassName(MetadataFeature::class);
-//        $metadataFeature->getMetadata()
-        // Find constraint
-        $m=$dependentTable->getMetadata();
         $row=$this->rowGateway;
         foreach(($dependentTable->getMetadata()['constraints'] ?? []) as $constraint) {
             if($constraint['REF_TABLE'] == $this->rowGateway->getTableGateway()->getTable()) {
@@ -112,7 +112,12 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             }
         }
         
-        \Ruga\Log::addLog("SQL={$select->getSqlString($adapter->getPlatform())}");
+        // add existing where at the end in parentheses
+        if($existingWhere->count() > 0) {
+            $select->where->addPredicate($existingWhere);
+        }
+        
+        \Ruga\Log::addLog("SQL={$select->getSqlString($dependentTable->getAdapter()->getPlatform())}");
         return $dependentTable->selectWith($select);
     }
     
