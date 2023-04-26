@@ -8,10 +8,10 @@ use Laminas\Db\ResultSet\ResultSetInterface;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
 use Ruga\Db\Adapter\Adapter;
-use Ruga\Db\Row\Exception\InvalidArgumentException;
-use Ruga\Db\Row\Exception\ReadonlyArgumentException;
+use Ruga\Db\Row\Exception\FeatureMissingException;
+use Ruga\Db\Row\Exception\NoConstraintsException;
+use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
-use Ruga\Db\Table\AbstractTable;
 use Ruga\Db\Table\Feature\MetadataFeature;
 use Ruga\Db\Table\TableInterface;
 
@@ -83,7 +83,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         }
         
         if(!$dependentTable instanceof TableInterface) {
-            throw new \InvalidArgumentException("\$dependentTable must be string, RowInterface or TableInterface");
+            throw new \InvalidArgumentException("\$dependentTable must be (string) table name, RowInterface or TableInterface");
         }
         
         /** @var TableInterface $dependentTable */
@@ -94,23 +94,43 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             $select->from($dependentTable->getTable());
         }
         
+        
+        // Check dependent table for Metadata feature
+        if(!$dependentTable->getFeatureSet()->getFeatureByClassName(MetadataFeature::class)) {
+            throw new FeatureMissingException(MetadataFeature::class);
+        }
+        
+        $dependentTableConstraints=[];
+        foreach(($dependentTable->getMetadata()['constraints'] ?? []) as $constraint) {
+            if(($constraint['TYPE'] === 'FOREIGN KEY') && ($constraint['REF_TABLE'] == $this->rowGateway->getTableGateway()->getTable())) {
+                if(($ruleKey === null) || ($ruleKey === $constraint['NAME']) || in_array($ruleKey, $constraint['COLUMNS'])) {
+                    $dependentTableConstraints[]=$constraint;
+                }
+            }
+        }
+        if(count($dependentTableConstraints) > 1) {
+            throw new TooManyConstraintsException("More than 1 constraints found for relation {$dependentTable->getTable()} }o--|| {$this->rowGateway->getTableGateway()->getTable()}: "
+                                        . implode(', ', array_map(static fn($item) => $item['NAME'], $dependentTableConstraints)));
+        }
+        if(count($dependentTableConstraints) < 1) {
+            throw new NoConstraintsException("No constraints found for relation {$dependentTable->getTable()} }o--|| {$this->rowGateway->getTableGateway()->getTable()}");
+        }
+
         // save existing where
         $existingWhere=$select->where;
         $select->reset(Select::WHERE);
         
+        // add the dependent where
         $row=$this->rowGateway;
-        foreach(($dependentTable->getMetadata()['constraints'] ?? []) as $constraint) {
-            if($constraint['REF_TABLE'] == $this->rowGateway->getTableGateway()->getTable()) {
-                $select->where(
-                    function (Where $where) use ($constraint, $row) {
-                        $n = $where->NEST;
-                        foreach($constraint['COLUMNS'] as $colPos => $column) {
-                            $n->and->equalTo($column, $row->offsetGet($constraint['REF_COLUMNS'][$colPos]));
-                        }
-                    }
-                );
+        $dependentTableConstraint=$dependentTableConstraints[0];
+        $select->where(
+            function (Where $where) use ($dependentTableConstraint, $row) {
+                $n = $where->NEST;
+                foreach($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
+                    $n->and->equalTo($column, $row->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]));
+                }
             }
-        }
+        );
         
         // add existing where at the end in parentheses
         if($existingWhere->count() > 0) {
