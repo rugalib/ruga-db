@@ -8,8 +8,9 @@ use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\Feature\DefaultValueFeature;
 use Ruga\Db\Row\Feature\FeatureSet;
 use Ruga\Db\Row\Feature\ParentFeature;
+use Ruga\Db\Row\Feature\ParentFeatureAttributesInterface;
 
-class MetaDefault extends AbstractRow implements MetaDefaultAttributesInterface
+class MetaDefault extends AbstractRow implements MetaDefaultAttributesInterface, ParentFeatureAttributesInterface
 {
     /**
      * Add features to the row class before it is initialized by the parent.

@@ -166,7 +166,6 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertSame('5', "{$row->id}");
         $this->assertSame('data 5', $row->data);
         
-        
         $items = $row->findDependentRowset(MusterTable::class);
         /** @var RowInterface $item */
         foreach ($items as $item) {

@@ -7,8 +7,9 @@ namespace Ruga\Db\Test\Model;
 use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Feature\FeatureSet;
 use Ruga\Db\Row\Feature\ParentFeature;
+use Ruga\Db\Row\Feature\ParentFeatureAttributesInterface;
 
-class User extends AbstractRugaRow
+class User extends AbstractRugaRow implements ParentFeatureAttributesInterface
 {
     protected function initFeatures(FeatureSet $featureSet): FeatureSet
     {
