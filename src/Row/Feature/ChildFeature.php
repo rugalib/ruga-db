@@ -236,9 +236,17 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         
         return array_shift($parentTableConstraints);
     }
-    
-    
-    
+
+
+    /**
+     * Find the parent row.
+     *
+     * @param $parentTable
+     * @param string|null $ruleKey
+     * @param Select|null $select
+     * @return RowInterface
+     * @throws \Exception
+     */
     public function findParentRow($parentTable, ?string $ruleKey = null, ?Select $select = null): RowInterface
     {
         $parentTable = $this->resolveTableArgument($parentTable);
