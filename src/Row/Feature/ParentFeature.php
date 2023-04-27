@@ -256,7 +256,6 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     ): ResultSetInterface {
         $dependentTable = $this->resolveDependentTable($dependentTable);
         
-        /** @var TableInterface $dependentTable */
         if ($select === null) {
             $select = $dependentTable->getSql()->select();
         } else {
