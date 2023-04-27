@@ -86,20 +86,15 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     
     
     /**
-     * Find dependent rows (children) in table $dependentTable.
+     * Resolves the given $dependentTable to a TableInterface object.
      *
-     * @param mixed       $dependentTable Table name, Table class name, Table object or Row object.
-     * @param string|null $ruleKey        Name of constraint or reference map entry to use.
-     * @param Select|null $select         Additional select statements.
+     * @param mixed $dependentTable Table name, Table class name, Table object or Row object.
      *
-     * @return ResultSetInterface
+     * @return TableInterface
      * @throws \Exception
      */
-    public function findDependentRowset(
-        $dependentTable,
-        ?string $ruleKey = null,
-        ?Select $select = null
-    ): ResultSetInterface {
+    private function resolveDependentTable($dependentTable): TableInterface
+    {
         /** @var Adapter $adapter */
         $adapter = $this->rowGateway->getTableGateway()->getAdapter();
         
@@ -115,15 +110,21 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             );
         }
         
-        /** @var TableInterface $dependentTable */
-        if ($select === null) {
-            $select = $dependentTable->getSql()->select();
-        } else {
-            // Set table
-            $select->from($dependentTable->getTable());
-        }
-        
-        
+        return $dependentTable;
+    }
+    
+    
+    
+    /**
+     * Find all matching constraints for the parent-child-relation.
+     *
+     * @param TableInterface $dependentTable
+     * @param string|null    $ruleKey
+     *
+     * @return array
+     */
+    private function resolveDependentTableConstraints(TableInterface $dependentTable, ?string $ruleKey = null): array
+    {
         // Check dependent table for Metadata feature
         if (!$dependentTable->getFeatureSet()->getFeatureByClassName(MetadataFeature::class)) {
             throw new FeatureMissingException(MetadataFeature::class);
@@ -156,7 +157,22 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             }
         }
         
-        
+        return $dependentTableConstraints;
+    }
+    
+    
+    
+    /**
+     * Get exactly one matching parent-child-relation. Throws exceptions otherwise.
+     *
+     * @param TableInterface $dependentTable
+     * @param string|null    $ruleKey
+     *
+     * @return array
+     */
+    public function getDependentTableConstraint(TableInterface $dependentTable, ?string $ruleKey = null): array
+    {
+        $dependentTableConstraints=$this->resolveDependentTableConstraints($dependentTable, $ruleKey);
         if (count($dependentTableConstraints) > 1) {
             throw new TooManyConstraintsException(
                 "More than 1 constraints found for relation {$dependentTable->getTable()} }o--|| {$this->rowGateway->getTableGateway()->getTable()}: "
@@ -169,13 +185,42 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             );
         }
         
+        return array_shift($dependentTableConstraints);
+    }
+    
+    
+    /**
+     * Find dependent rows (children) in table $dependentTable.
+     *
+     * @param mixed       $dependentTable Table name, Table class name, Table object or Row object.
+     * @param string|null $ruleKey        Name of constraint or reference map entry to use.
+     * @param Select|null $select         Additional select statements.
+     *
+     * @return ResultSetInterface
+     * @throws \Exception
+     */
+    public function findDependentRowset(
+        $dependentTable,
+        ?string $ruleKey = null,
+        ?Select $select = null
+    ): ResultSetInterface {
+        $dependentTable = $this->resolveDependentTable($dependentTable);
+        
+        /** @var TableInterface $dependentTable */
+        if ($select === null) {
+            $select = $dependentTable->getSql()->select();
+        } else {
+            // Set table
+            $select->from($dependentTable->getTable());
+        }
+        
         // save existing where
         $existingWhere = $select->where;
         $select->reset(Select::WHERE);
         
         // add the dependent where
         $row = $this->rowGateway;
-        $dependentTableConstraint = array_shift($dependentTableConstraints);
+        $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
         $select->where(
             function (Where $where) use ($dependentTableConstraint, $row) {
                 $n = $where->NEST;
@@ -193,5 +238,31 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         \Ruga\Log::addLog("SQL={$select->getSqlString($dependentTable->getAdapter()->getPlatform())}");
         return $dependentTable->selectWith($select);
     }
+    
+    
+    
+    /**
+     * Create a new row of a dependent table.
+     *
+     * @param mixed       $dependentTable Table name, Table class name, Table object or Row object.
+     * @param array       $rowData
+     * @param string|null $ruleKey        Name of constraint or reference map entry to use.
+     *
+     * @return RowInterface
+     * @throws \ReflectionException
+     */
+    
+    public function createDependentRow($dependentTable, array $rowData = [], ?string $ruleKey = null): RowInterface
+    {
+        $dependentTable=$this->resolveDependentTable($dependentTable);
+        $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
+        
+        foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
+            $rowData[$column]=$this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]);
+        }
+        
+        return $dependentTable->createRow($rowData);
+    }
+    
     
 }

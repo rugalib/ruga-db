@@ -174,4 +174,27 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         }
     }
     
+    
+    public function testCanCreateNewDependentRow()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('5', "{$row->id}");
+        $this->assertSame('data 5', $row->data);
+        
+        
+        $item=$row->createDependentRow(MusterTable::class, ['fullname' => 'Hallo Welt']);
+        $item->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        
+    }
+    
 }
