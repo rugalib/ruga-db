@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Ruga\Db\Row\Feature;
 
+use Laminas\Db\Adapter\Driver\ResultInterface;
 use Laminas\Db\ResultSet\ResultSetInterface;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
 use Ruga\Db\Adapter\Adapter;
-use Ruga\Db\Row\AbstractRow;
+use Ruga\Db\ResultSet\ResultSet;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
@@ -56,6 +57,32 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     }
     
     
+    private function saveDependentRows()
+    {
+        foreach ($this->dependentRows as $constraintName => $dependentRows) {
+            foreach ($dependentRows as $uniqueid => $dependentRowInfo) {
+                /** @var RowInterface $dependentRow */
+                $dependentRow=$dependentRowInfo['dependentRow'];
+                
+                if($dependentRowInfo['action'] == 'save') {
+                    if(!$this->rowGateway->isNew()) {
+                        // If parent row is already saved, set foreign key values in dependent row
+                        $dependentTableConstraint = $this->getDependentTableConstraint($this->resolveDependentTable($dependentRow), $constraintName);
+                        foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
+                            $dependentRow->offsetSet($column, $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]));
+                        }
+                    } else {
+                        throw new \RuntimeException('Parent row must be saved first');
+                    }
+                    $dependentRow->save();
+                }
+                if($dependentRowInfo['action'] == 'delete') {
+                    $dependentRow->delete();
+                }
+            }
+        }
+    }
+    
     
     /**
      * Before this (parent) row is updated, save all dependent (child) rows.
@@ -66,18 +93,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     public function preUpdate()
     {
         \Ruga\Log::functionHead($this);
-        
-        foreach ($this->dependentRows as $constraintName => $dependentRows) {
-            /** @var RowInterface $dependentRow */
-            foreach ($dependentRows as $uniqueid => $dependentRowInfo) {
-                if($dependentRowInfo['action'] == 'save') {
-                    $dependentRowInfo['dependentRow']->save();
-                }
-                if($dependentRowInfo['action'] == 'delete') {
-                    $dependentRowInfo['dependentRow']->delete();
-                }
-            }
-        }
+        $this->saveDependentRows();
     }
     
     
@@ -91,18 +107,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     public function postInsert()
     {
         \Ruga\Log::functionHead($this);
-        
-        foreach ($this->dependentRows as $constraintName => $dependentRows) {
-            /** @var RowInterface $dependentRow */
-            foreach ($dependentRows as $uniqueid => $dependentRowInfo) {
-                if($dependentRowInfo['action'] == 'save') {
-                    $dependentRowInfo['dependentRow']->save();
-                }
-                if($dependentRowInfo['action'] == 'delete') {
-                    $dependentRowInfo['dependentRow']->delete();
-                }
-            }
-        }
+        $this->saveDependentRows();
     }
     
     
@@ -123,11 +128,9 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         
         $uniqueid.='@' . get_class($dependentRow);
         
-        $a=[];
-        $a['uniqueid']=$uniqueid;
-        $a['action']=$action;
-        $a['dependentRow']=$dependentRow;
-        $this->dependentRows[$constraintName][$uniqueid]=$a;
+        $this->dependentRows[$constraintName][$uniqueid]['uniqueid']=$uniqueid;
+        $this->dependentRows[$constraintName][$uniqueid]['action']=$action;
+        $this->dependentRows[$constraintName][$uniqueid]['dependentRow']=$dependentRow;
     }
     
     
@@ -283,7 +286,18 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         }
         
         \Ruga\Log::addLog("SQL={$select->getSqlString($dependentTable->getAdapter()->getPlatform())}");
-        return $dependentTable->selectWith($select);
+        /** @var ResultSetInterface $rowset */
+        $rowset=$dependentTable->selectWith($select);
+        
+        $a=[];
+        foreach($rowset as $row) {
+            $a[]=$row;
+            $this->rowListAdd($row, $dependentTableConstraint['NAME']);
+        }
+
+        // Must re-initialize ResultSet to keep reference to the rows
+        $rowset->initialize($a);
+        return $rowset;
     }
     
     
@@ -304,8 +318,11 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         $dependentTable = $this->resolveDependentTable($dependentTable);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
         
-        foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
-            $rowData[$column] = $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]);
+        if(!$this->rowGateway->isNew()) {
+            // If parent row is already saved, set foreign key values in dependent row
+            foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
+                $rowData[$column] = $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]);
+            }
         }
         
         $dependentRow = $dependentTable->createRow($rowData);
@@ -353,11 +370,14 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         $dependentTable = $this->resolveDependentTable($dependentRow);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
         
-        foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
-            $dependentRow->offsetSet(
-                $column,
-                $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos])
-            );
+        if(!$this->rowGateway->isNew()) {
+            // If parent row is already saved, set foreign key values in dependent row
+            foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
+                $dependentRow->offsetSet(
+                    $column,
+                    $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos])
+                );
+            }
         }
         
         // Add dependent row to list for later saving

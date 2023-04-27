@@ -422,4 +422,111 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertCount(1, $items);
     }
     
+    
+    
+    public function testCanEditAndSaveThruParent()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('5', "{$row->id}");
+        $this->assertSame('data 5', $row->data);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
+        
+        $row->linkDependentRow($dependentRow);
+        $row->save();
+        unset($dependentRow);
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        $this->assertCount(2, $items);
+        
+        $dependentRow = $row->findDependentRowset(MusterTable::class, null, (new Select())->where("`id`=1"))->current();
+        $this->assertInstanceOf(Muster::class, $dependentRow);
+        
+        
+        $dependentRow->offsetSet('fullname', 'This text has changed');
+        unset($dependentRow);
+        $row->save();
+        
+        // re-read the row
+        $dependentRow = $row->findDependentRowset(MusterTable::class, null, (new Select())->where("`id`=1"))->current();
+        $this->assertInstanceOf(Muster::class, $dependentRow);
+        $this->assertSame('This text has changed', $dependentRow->fullname);
+    }
+    
+    
+    
+    public function testCanCreateNewDependentRowWithNewParent()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->createRow(['data' => 'data 8 (new)']);
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        
+        $item = $row->createDependentRow(
+            MusterTable::class,
+            ['fullname' => 'Hallo Welt testCanCreateNewDependentRowWithNewParent']
+        );
+        $row->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount(1, $items);
+    }
+    
+    
+    
+    public function testCanLinkNewDependentRowWithNewParent()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->createRow(['data' => 'data 8 (new)']);
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt testCanLinkNewDependentRowWithNewParent']);
+        
+        $row->linkDependentRow($dependentRow);
+        $row->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount(1, $items);
+    }
+    
+    
+    public function testCanLinkAndEditNewDependentRowWithNewParent()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->createRow(['data' => 'data 8 (new)']);
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt testCanLinkNewDependentRowWithNewParent']);
+        
+        $row->linkDependentRow($dependentRow);
+        $dependentRow->offsetSet('fullname', 'This value has been changed by testCanLinkNewDependentRowWithNewParent');
+        $row->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount(1, $items);
+    }
+    
 }

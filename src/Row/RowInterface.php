@@ -7,6 +7,9 @@ namespace Ruga\Db\Row;
 use Laminas\Db\RowGateway\RowGatewayInterface;
 use Ruga\Db\Table\AbstractTable;
 
+/**
+ * @see AbstractRow
+ */
 interface RowInterface extends RowGatewayInterface
 {
     /**
