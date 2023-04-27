@@ -101,13 +101,27 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         }
         
         $dependentTableConstraints=[];
+        // Find matching constraints in metadata
         foreach(($dependentTable->getMetadata()['constraints'] ?? []) as $constraint) {
             if(($constraint['TYPE'] === 'FOREIGN KEY') && ($constraint['REF_TABLE'] == $this->rowGateway->getTableGateway()->getTable())) {
                 if(($ruleKey === null) || ($ruleKey === $constraint['NAME']) || in_array($ruleKey, $constraint['COLUMNS'])) {
-                    $dependentTableConstraints[]=$constraint;
+                    $dependentTableConstraints[$constraint['NAME']]=$constraint;
                 }
             }
         }
+        
+        // Find matching constraints in REFERENCEMAP
+        foreach($dependentTable::REFERENCEMAP ?? [] as $name => $constraint) {
+            $constraint['NAME']=$name;
+            if($constraint['REF_TABLE_CLASS']) $constraint['REF_TABLE']=$constraint['REF_TABLE_CLASS']::TABLENAME;
+            if($constraint['REF_TABLE'] == $this->rowGateway->getTableGateway()->getTable()) {
+                if(($ruleKey === null) || ($ruleKey === $name) || in_array($ruleKey, $constraint['COLUMNS'])) {
+                    $dependentTableConstraints[$name]=$constraint;
+                }
+            }
+        }
+        
+        
         if(count($dependentTableConstraints) > 1) {
             throw new TooManyConstraintsException("More than 1 constraints found for relation {$dependentTable->getTable()} }o--|| {$this->rowGateway->getTableGateway()->getTable()}: "
                                         . implode(', ', array_map(static fn($item) => $item['NAME'], $dependentTableConstraints)));
@@ -122,7 +136,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         
         // add the dependent where
         $row=$this->rowGateway;
-        $dependentTableConstraint=$dependentTableConstraints[0];
+        $dependentTableConstraint=array_shift($dependentTableConstraints);
         $select->where(
             function (Where $where) use ($dependentTableConstraint, $row) {
                 $n = $where->NEST;

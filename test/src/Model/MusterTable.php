@@ -11,4 +11,11 @@ class MusterTable extends AbstractRugaTable
     const PRIMARYKEY = ['id'];
     const TABLENAME = 'Muster';
     const ROWCLASS = Muster::class;
+    const REFERENCEMAP = [
+        'SimpleTableLink' => [
+            'COLUMNS' => ['Simple_id'],
+            'REF_TABLE_CLASS' => MetaDefaultTable::class,
+            'REF_COLUMNS' => ['id']
+        ]
+    ];
 }

@@ -10,5 +10,5 @@ class CartTable extends AbstractRugaTable
     const PRIMARYKEY = ['id'];
     const TABLENAME = 'Cart';
     const ROWCLASS = Cart::class;
-    const DEPENDENTTABLES = [CartItemTable::class];
+//    const DEPENDENTTABLES = [CartItemTable::class];
 }

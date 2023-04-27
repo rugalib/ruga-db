@@ -49,6 +49,15 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
      */
     const ROWCLASS = AbstractRow::class;
     
+    /**
+     * This map describes the relations to other tables.
+     */
+    const REFERENCEMAP = [];
+    
+    /**
+     * Tables, which hold relations to this table.
+     */
+    const DEPENDENTTABLES = [];
     
     /**
      * Stores the name of the schema.
