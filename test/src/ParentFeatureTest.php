@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace Ruga\Db\Test;
 
 
+use Laminas\Db\Adapter\Exception\InvalidQueryException;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
+use Ruga\Db\Test\Model\CartItem;
 use Ruga\Db\Test\Model\CartItemTable;
 use Ruga\Db\Test\Model\CartTable;
 use Ruga\Db\Test\Model\MetaDefaultTable;
+use Ruga\Db\Test\Model\Muster;
 use Ruga\Db\Test\Model\MusterTable;
 use Ruga\Db\Test\Model\SimpleTable;
 
@@ -211,7 +214,7 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
         $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
 
-        $row->linkTo($dependentRow);
+        $row->linkDependentRow($dependentRow);
         $dependentRow->save();
         
         $items = $row->findDependentRowset(MusterTable::class);
@@ -221,5 +224,59 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
             echo PHP_EOL;
         }
     }
+    
+    public function testCanUnlinkDependentRow()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('5', "{$row->id}");
+        $this->assertSame('data 5', $row->data);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
+        
+        $row->linkDependentRow($dependentRow);
+        $dependentRow->save();
+        unset($dependentRow);
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        $this->assertCount(2, $items);
+        
+        $dependentRow=$row->findDependentRowset(MusterTable::class, null, (new Select())->where("`id`=1"))->current();
+        $this->assertInstanceOf(Muster::class, $dependentRow);
+        
+        $row->unlinkDependentRow($dependentRow);
+        $dependentRow->save();
+    }
+    
+    
+    public function testCanNotUnlinkDependentRow()
+    {
+        $t = new \Ruga\Db\Test\Model\CartTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Cart $row */
+        $row = $t->findById(1)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Cart::class, $row);
+        $this->assertSame('1', "{$row->id}");
+        $this->assertSame('cart 1', $row->fullname);
+        
+        $dependentRow = $row->findDependentRowset(
+            CartItemTable::class,
+            null,
+            (new Select())->where(function (Where $where) {
+                $where->like('fullname', '%item 2');
+            })
+        )->current();
+        $this->assertInstanceOf(CartItem::class, $dependentRow);
+        
+        $row->unlinkDependentRow($dependentRow);
+        
+        $this->expectException(InvalidQueryException::class);
+        $dependentRow->save();
+    }
+    
+    
+    
     
 }

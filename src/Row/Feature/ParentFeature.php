@@ -20,9 +20,6 @@ use Ruga\Db\Table\TableInterface;
  */
 class ParentFeature extends AbstractFeature implements ParentFeatureAttributesInterface
 {
-    // Stores the dependent (child) table class names
-    private array $dependentTables = [];
-    
     private ?MetadataFeature $metadataFeature = null;
     
     
@@ -53,34 +50,6 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
                 get_class($this->rowGateway) . " must implement " . ParentFeatureAttributesInterface::class
             );
         }
-        /*
-        $metadataFeature=$this->getMetadataFeature();
-        foreach($metadataFeature->getMetadata()['constraint_references'] as $constraint_name => $constraint_reference) {
-            $this->dependentTables[]=$constraint_reference['TABLE_CLASS'] ?? $constraint_reference['TABLE'];
-//            $otherTable=$adapter->tableFactory($constraint_reference['TABLE']);
-        }
-        */
-    }
-    
-    
-    
-    /**
-     * Constructs a display name from the given fields.
-     * Fullname is saved in the row to speed up queries.
-     *
-     * @return string
-     */
-    public function dumpChildren($a, $b, $c): array
-    {
-        \Ruga\Log::functionHead($this);
-        \Ruga\Log::addLog("\$a=$a | \$b=$b | \$c=$c");
-        
-        $metadataFeature = $this->getMetadataFeature();
-        /** @var Adapter $adapter */
-        $adapter = $this->rowGateway->getTableGateway()->getAdapter();
-        
-        
-        return $this->dependentTables;
     }
     
     
@@ -172,7 +141,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      */
     public function getDependentTableConstraint(TableInterface $dependentTable, ?string $ruleKey = null): array
     {
-        $dependentTableConstraints=$this->resolveDependentTableConstraints($dependentTable, $ruleKey);
+        $dependentTableConstraints = $this->resolveDependentTableConstraints($dependentTable, $ruleKey);
         if (count($dependentTableConstraints) > 1) {
             throw new TooManyConstraintsException(
                 "More than 1 constraints found for relation {$dependentTable->getTable()} }o--|| {$this->rowGateway->getTableGateway()->getTable()}: "
@@ -187,6 +156,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         
         return array_shift($dependentTableConstraints);
     }
+    
     
     
     /**
@@ -254,11 +224,11 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     
     public function createDependentRow($dependentTable, array $rowData = [], ?string $ruleKey = null): RowInterface
     {
-        $dependentTable=$this->resolveDependentTable($dependentTable);
+        $dependentTable = $this->resolveDependentTable($dependentTable);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
         
         foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
-            $rowData[$column]=$this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]);
+            $rowData[$column] = $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]);
         }
         
         return $dependentTable->createRow($rowData);
@@ -275,18 +245,43 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      * @return void
      * @throws \Exception
      */
-    public function linkTo(RowInterface $dependentRow, ?string $ruleKey = null): RowInterface
+    public function linkDependentRow(RowInterface $dependentRow, ?string $ruleKey = null): RowInterface
     {
-        $dependentTable=$this->resolveDependentTable($dependentRow);
+        $dependentTable = $this->resolveDependentTable($dependentRow);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
         
         foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
-            $dependentRow->offsetSet($column, $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]));
+            $dependentRow->offsetSet(
+                $column,
+                $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos])
+            );
         }
         
         return $dependentRow;
     }
     
+    
+    
+    /**
+     * Unlink a dependent row from this parent.
+     *
+     * @param RowInterface $dependentRow
+     * @param string|null  $ruleKey
+     *
+     * @return RowInterface
+     * @throws \Exception
+     */
+    public function unlinkDependentRow(RowInterface $dependentRow, ?string $ruleKey = null): RowInterface
+    {
+        $dependentTable = $this->resolveDependentTable($dependentRow);
+        $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
+        
+        foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
+            $dependentRow->offsetSet($column, null);
+        }
+        
+        return $dependentRow;
+    }
     
     
 }
