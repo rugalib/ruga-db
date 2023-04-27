@@ -265,4 +265,28 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     }
     
     
+    
+    /**
+     * Link a dependent row to this parent.
+     *
+     * @param RowInterface $dependentRow
+     * @param string|null  $ruleKey
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function linkTo(RowInterface $dependentRow, ?string $ruleKey = null): RowInterface
+    {
+        $dependentTable=$this->resolveDependentTable($dependentRow);
+        $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
+        
+        foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
+            $dependentRow->offsetSet($column, $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]));
+        }
+        
+        return $dependentRow;
+    }
+    
+    
+    
 }
