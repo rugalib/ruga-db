@@ -8,6 +8,7 @@ use Laminas\Db\ResultSet\ResultSetInterface;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
 use Ruga\Db\Adapter\Adapter;
+use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
@@ -21,6 +22,8 @@ use Ruga\Db\Table\TableInterface;
 class ParentFeature extends AbstractFeature implements ParentFeatureAttributesInterface
 {
     private ?MetadataFeature $metadataFeature = null;
+    
+    private $dependentRows = [];
     
     
     
@@ -52,6 +55,80 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         }
     }
     
+    
+    
+    /**
+     * Before this (parent) row is updated, save all dependent (child) rows.
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function preUpdate()
+    {
+        \Ruga\Log::functionHead($this);
+        
+        foreach ($this->dependentRows as $constraintName => $dependentRows) {
+            /** @var RowInterface $dependentRow */
+            foreach ($dependentRows as $uniqueid => $dependentRowInfo) {
+                if($dependentRowInfo['action'] == 'save') {
+                    $dependentRowInfo['dependentRow']->save();
+                }
+                if($dependentRowInfo['action'] == 'delete') {
+                    $dependentRowInfo['dependentRow']->delete();
+                }
+            }
+        }
+    }
+    
+    
+    
+    /**
+     * After this (parent) row is inserted, save all dependent (child) rows.
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function postInsert()
+    {
+        \Ruga\Log::functionHead($this);
+        
+        foreach ($this->dependentRows as $constraintName => $dependentRows) {
+            /** @var RowInterface $dependentRow */
+            foreach ($dependentRows as $uniqueid => $dependentRowInfo) {
+                if($dependentRowInfo['action'] == 'save') {
+                    $dependentRowInfo['dependentRow']->save();
+                }
+                if($dependentRowInfo['action'] == 'delete') {
+                    $dependentRowInfo['dependentRow']->delete();
+                }
+            }
+        }
+    }
+    
+    
+    public function postSave()
+    {
+        // Successfully saved => delete dependent row list
+        $this->dependentRows=[];
+    }
+    
+    
+    
+    private function rowListAdd(RowInterface $dependentRow, string $constraintName, string $action='save')
+    {
+        $uniqueid=implode('-', $dependentRow->primaryKeyData ?? []);
+        if(empty($uniqueid)) {
+            $uniqueid='?' . date('U') . '?' . sprintf('%05u', count($this->dependentRows));
+        }
+        
+        $uniqueid.='@' . get_class($dependentRow);
+        
+        $a=[];
+        $a['uniqueid']=$uniqueid;
+        $a['action']=$action;
+        $a['dependentRow']=$dependentRow;
+        $this->dependentRows[$constraintName][$uniqueid]=$a;
+    }
     
     
     /**
@@ -231,9 +308,35 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             $rowData[$column] = $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]);
         }
         
-        return $dependentTable->createRow($rowData);
+        $dependentRow = $dependentTable->createRow($rowData);
+        
+        // Add dependent row to list for later saving
+        $this->rowListAdd($dependentRow, $dependentTableConstraint['NAME']);
+        
+        return $dependentRow;
     }
     
+    
+    
+    /**
+     * Delete a dependent row. The delete is done, when the parent row is saved.
+     *
+     * @param RowInterface $dependentRow
+     * @param string|null  $ruleKey
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function deleteDependentRow(RowInterface $dependentRow, ?string $ruleKey = null)
+    {
+        $dependentTable = $this->resolveDependentTable($dependentRow);
+        $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
+
+        $this->unlinkDependentRow($dependentRow, $ruleKey);
+        
+        // Add dependent row to list for later saving
+        $this->rowListAdd($dependentRow, $dependentTableConstraint['NAME'], 'delete');
+    }
     
     
     /**
@@ -257,6 +360,9 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             );
         }
         
+        // Add dependent row to list for later saving
+        $this->rowListAdd($dependentRow, $dependentTableConstraint['NAME']);
+        
         return $dependentRow;
     }
     
@@ -279,6 +385,9 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
             $dependentRow->offsetSet($column, null);
         }
+        
+        // Add dependent row to list for later saving
+        $this->rowListAdd($dependentRow, $dependentTableConstraint['NAME']);
         
         return $dependentRow;
     }

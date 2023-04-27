@@ -15,6 +15,7 @@ use Ruga\Db\Row\RowInterface;
  * @method RowInterface createDependentRow($dependentTable, array $rowData = [], ?string $ruleKey = null) Create a new row of a dependent table.
  * @method RowInterface linkDependentRow(RowInterface $dependentRow, ?string $ruleKey = null) Link a dependent row to this parent.
  * @method RowInterface unlinkDependentRow(RowInterface $dependentRow, ?string $ruleKey = null)  Unlink a dependent row from this parent.
+ * @method void deleteDependentRow(RowInterface $dependentRow, ?string $ruleKey = null) Delete a dependent row. The delete is done, when the parent row is saved.
  *
  */
 interface ParentFeatureAttributesInterface

@@ -160,6 +160,7 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
     public function testCanFindDependentRowsWithManualConstraint()
     {
         $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
@@ -178,6 +179,7 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
     public function testCanCreateNewDependentRow()
     {
         $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
@@ -188,7 +190,7 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertSame('data 5', $row->data);
         
         
-        $item=$row->createDependentRow(MusterTable::class, ['fullname' => 'Hallo Welt']);
+        $item = $row->createDependentRow(MusterTable::class, ['fullname' => 'Hallo Welt']);
         $item->save();
         
         $items = $row->findDependentRowset(MusterTable::class);
@@ -197,7 +199,6 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
             print_r($item->idname);
             echo PHP_EOL;
         }
-        
     }
     
     
@@ -213,7 +214,7 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         
         $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
         $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
-
+        
         $row->linkDependentRow($dependentRow);
         $dependentRow->save();
         
@@ -223,7 +224,10 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
             print_r($item->idname);
             echo PHP_EOL;
         }
+        $this->assertCount(2, $items);
     }
+    
+    
     
     public function testCanUnlinkDependentRow()
     {
@@ -244,12 +248,16 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $items = $row->findDependentRowset(MusterTable::class);
         $this->assertCount(2, $items);
         
-        $dependentRow=$row->findDependentRowset(MusterTable::class, null, (new Select())->where("`id`=1"))->current();
+        $dependentRow = $row->findDependentRowset(MusterTable::class, null, (new Select())->where("`id`=1"))->current();
         $this->assertInstanceOf(Muster::class, $dependentRow);
         
         $row->unlinkDependentRow($dependentRow);
         $dependentRow->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        $this->assertCount(1, $items);
     }
+    
     
     
     public function testCanNotUnlinkDependentRow()
@@ -278,5 +286,140 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     
     
+    public function testCanCreateNewDependentRowAndSaveThruParent()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('5', "{$row->id}");
+        $this->assertSame('data 5', $row->data);
+        
+        
+        $row->createDependentRow(MusterTable::class, ['fullname' => 'Hallo Welt']);
+        $row->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount(2, $items);
+    }
+    
+    
+    
+    public function testCanLinkDependentRowAndSaveThruParent()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('5', "{$row->id}");
+        $this->assertSame('data 5', $row->data);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
+        
+        $row->linkDependentRow($dependentRow);
+        $row->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount(2, $items);
+    }
+    
+    
+    
+    public function testCanUnlinkDependentRowAndSaveThruParent()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('5', "{$row->id}");
+        $this->assertSame('data 5', $row->data);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
+        
+        $row->linkDependentRow($dependentRow);
+        $row->save();
+        unset($dependentRow);
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        $this->assertCount(2, $items);
+        
+        $dependentRow = $row->findDependentRowset(MusterTable::class, null, (new Select())->where("`id`=1"))->current();
+        $this->assertInstanceOf(Muster::class, $dependentRow);
+        
+        $row->unlinkDependentRow($dependentRow);
+        $row->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        $this->assertCount(1, $items);
+    }
+    
+    
+    
+    public function testCanNotUnlinkDependentRowAndSaveThruParent()
+    {
+        $t = new \Ruga\Db\Test\Model\CartTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Cart $row */
+        $row = $t->findById(1)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Cart::class, $row);
+        $this->assertSame('1', "{$row->id}");
+        $this->assertSame('cart 1', $row->fullname);
+        
+        $dependentRow = $row->findDependentRowset(
+            CartItemTable::class,
+            null,
+            (new Select())->where(function (Where $where) {
+                $where->like('fullname', '%item 2');
+            })
+        )->current();
+        $this->assertInstanceOf(CartItem::class, $dependentRow);
+        
+        $row->unlinkDependentRow($dependentRow);
+        
+        $this->expectException(InvalidQueryException::class);
+        $row->save();
+    }
+    
+    
+    
+    public function testCanDeleteDependentRowAndSaveThruParent()
+    {
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('5', "{$row->id}");
+        $this->assertSame('data 5', $row->data);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
+        
+        $row->linkDependentRow($dependentRow);
+        $row->save();
+        unset($dependentRow);
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        $this->assertCount(2, $items);
+        
+        $dependentRow = $row->findDependentRowset(MusterTable::class, null, (new Select())->where("`id`=1"))->current();
+        $this->assertInstanceOf(Muster::class, $dependentRow);
+        
+        $row->deleteDependentRow($dependentRow);
+        $row->save();
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        $this->assertCount(1, $items);
+    }
     
 }

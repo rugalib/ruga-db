@@ -7,6 +7,21 @@ namespace Ruga\Db\Row\Feature;
 use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\Exception\InvalidArgumentException;
 
+/**
+ * @method preInitialize()
+ * @method postInitialize()
+ * @method prePopulate(array &$rowData, bool &$rowExistsInDatabase)
+ * @method postPopulate()
+ * @method preSave()
+ * @method postSave()
+ * @method preInsert()
+ * @method postInsert()
+ * @method preUpdate()
+ * @method postUpdate()
+ * @method preOffsetSet($offset, &$value)
+ * @method preToArray(array &$dataarray)
+ * @method postToArray(array &$dataarray)
+ */
 class AbstractFeature extends \Laminas\Db\RowGateway\Feature\AbstractFeature
 {
     /**
@@ -82,25 +97,7 @@ class AbstractFeature extends \Laminas\Db\RowGateway\Feature\AbstractFeature
     
     /*
     
-    public function preInitialize();
-    public function postInitialize();
-
-    public function prePopulate(array &$rowData, bool &$rowExistsInDatabase);
-    public function postPopulate();
     
-    public function preSave();
-    public function postSave();
-    
-    public function preInsert();
-    public function postInsert();
-
-    public function preUpdate();
-    public function postUpdate();
-
-    public function preOffsetSet($offset, &$value);
-
-    public function preToArray(array &$dataarray);
-    public function postToArray(array &$dataarray);
     
     */
 }
