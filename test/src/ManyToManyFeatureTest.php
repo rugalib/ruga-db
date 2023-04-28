@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Ruga\Db\Test;
 
 
+use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\RowInterface;
+use Ruga\Db\Test\Model\CartTable;
 use Ruga\Db\Test\Model\OrganizationTable;
 use Ruga\Db\Test\Model\PartyHasOrganizationTable;
 
@@ -21,11 +23,8 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         /** @var \Ruga\Db\Test\Model\Party $nRow */
         $nRow = $nTable->findById(4)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
-
-
-        $mRowset=$nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class);
         
-        
+        $mRowset = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class);
         
         /** @var RowInterface $item */
         foreach ($mRowset as $item) {
@@ -35,5 +34,18 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertCount(1, $mRowset);
     }
     
+    
+    
+    public function testCanCreateNewManyToManyRow()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(1)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        $mRow = $nRow->createManyToManyRow(OrganizationTable::class, PartyHasOrganizationTable::class, ['name' => 'Kaufmann']);
+        
+        $nRow->save();
+    }
     
 }

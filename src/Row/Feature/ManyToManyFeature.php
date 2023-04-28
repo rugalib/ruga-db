@@ -40,6 +40,107 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     }
     
     
+    private function saveMRow(RowInterface $iRow, array $mRowsList)
+    {
+        foreach($mRowsList as $mConstraintName => $mRows) {
+            foreach($mRows as $mUniqueid => $mRowInfo) {
+                /** @var RowInterface $mRow */
+                $mRow=$mRowInfo['mRow'];
+                
+                if($mRowInfo['action'] == 'save') {
+                    $mRow->save();
+                    
+                    // Update foreign key
+                    $iTable = $this->resolveTableArgument($iRow);
+                    $mTable = $this->resolveTableArgument($mRow);
+                    $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mConstraintName);
+                    foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
+                        $iRow->offsetSet(
+                            $column,
+                            $mRow->offsetGet($mTableConstraint['REF_COLUMNS'][$colPos])
+                        );
+                    }
+                }
+                if($mRowInfo['action'] == 'unlink') {
+                
+                }
+                if($mRowInfo['action'] == 'delete') {
+                
+                }
+            }
+        }
+    }
+    
+    private function saveIntersectionRow()
+    {
+        foreach($this->manyToManyRows as $iConstraintName => $iRows) {
+            foreach($iRows as $iUniqueid => $iRowInfo) {
+                /** @var RowInterface $iRow */
+                $iRow=$iRowInfo['iRow'];
+                
+                if($iRowInfo['action'] == 'save') {
+                    $this->saveMRow($iRow, $iRowInfo['m']);
+                    
+                    if (!$this->rowGateway->isNew()) {
+                        // If parent row is already saved, set foreign key values in dependent row
+                        $iTable = $this->resolveTableArgument($iRow);
+                        $nTable = $this->resolveTableArgument($this->rowGateway);
+                        $iTableConstraint = $this->getManyToManyTableConstraint(
+                            $nTable,
+                            $iTable,
+                            $iConstraintName
+                        );
+                        foreach ($iTableConstraint['COLUMNS'] as $colPos => $column) {
+                            $iRow->offsetSet(
+                                $column,
+                                $this->rowGateway->offsetGet(
+                                    $iTableConstraint['REF_COLUMNS'][$colPos]
+                                )
+                            );
+                        }
+                    } else {
+                        throw new \RuntimeException('Parent row must be saved first');
+                    }
+                    $iRow->save();
+                }
+                if($iRowInfo['action'] == 'unlink') {
+                
+                }
+                if($iRowInfo['action'] == 'delete') {
+                
+                }
+                
+            }
+        }
+    }
+    
+    
+    /**
+     * Before this (parent) row is updated, save all dependent (child) rows.
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function preUpdate()
+    {
+        \Ruga\Log::functionHead($this);
+        $this->saveIntersectionRow();
+    }
+    
+    
+    /**
+     * After this (parent) row is inserted, save all intersection (child) rows.
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function postInsert()
+    {
+        \Ruga\Log::functionHead($this);
+        $this->saveIntersectionRow();
+    }
+    
+    
     
     public function postSave()
     {
@@ -48,29 +149,38 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     }
     
     
-    
-    /**
-     * Add $parentRow to the internal list of parents.
-     *
-     * @param RowInterface $parentRow
-     * @param string       $constraintName
-     * @param string       $action
-     *
-     * @return void
-     */
-    public function manyToManyRowListAdd(RowInterface $parentRow, string $constraintName, string $action = 'save')
+    private function manyToManyRowListAdd(RowInterface $mRow, RowInterface $iRow, string $mConstraintName, string $nConstraintName, string $action='save')
     {
-        throw new \RuntimeException('NOT IMPLEMENTED');
-        $uniqueid = implode('-', $parentRow->primaryKeyData ?? []);
-        if (empty($uniqueid)) {
-            $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->parentRows));
+        $nTable = $this->rowGateway->getTableGateway();
+        $iTable = $this->resolveTableArgument($iRow);
+        $iTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nConstraintName);
+        $nConstraintName = $iTableConstraint['NAME'];
+        
+        $iUniqueid = implode('-', $iRow->primaryKeyData ?? []);
+        if (empty($iUniqueid)) {
+            $iUniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->manyToManyRows));
         }
+        $iUniqueid .= '@' . get_class($iRow);
         
-        $uniqueid .= '@' . get_class($parentRow);
+        $this->manyToManyRows[$nConstraintName][$iUniqueid]['uniqueid'] = $iUniqueid;
+        $this->manyToManyRows[$nConstraintName][$iUniqueid]['action'] = $action;
+        $this->manyToManyRows[$nConstraintName][$iUniqueid]['iRow'] = $iRow;
+        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'] = [];
         
-        $this->parentRows[$constraintName][$uniqueid]['uniqueid'] = $uniqueid;
-        $this->parentRows[$constraintName][$uniqueid]['action'] = $action;
-        $this->parentRows[$constraintName][$uniqueid]['dependentRow'] = $parentRow;
+        
+        
+        $mTable = $this->resolveTableArgument($mRow);
+        $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mConstraintName);
+        $mConstraintName = $mTableConstraint['NAME'];
+        
+        $mUniqueid = implode('-', $mRow->primaryKeyData ?? []);
+        if (empty($mUniqueid)) {
+            $mUniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->manyToManyRows));
+        }
+        $mUniqueid .= '@' . get_class($mRow);
+        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['uniqueid'] = $mUniqueid;
+        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['action'] = $action;
+        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['mRow'] = $mRow;
     }
     
     
@@ -276,5 +386,42 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         return $mRowset;
     }
     
+    
+    
+    /**
+     * Create a new row in the $mTable, linked via $intersectionTable.
+     *
+     * @param mixed            $mTable
+     * @param mixed            $intersectionTable
+     * @param array       $mRowData
+     * @param array       $iRowData
+     * @param string|null $mRuleKey
+     * @param string|null $nRuleKey
+     *
+     * @return RowInterface
+     * @throws \ReflectionException
+     */
+    public function createManyToManyRow($mTable, $intersectionTable, array $mRowData = [], array $iRowData = [], ?string $mRuleKey = null, ?string $nRuleKey = null): RowInterface
+    {
+        $nTable = $this->rowGateway->getTableGateway();
+        $mTable = $this->resolveTableArgument($mTable);
+        $intersectionTable = $this->resolveTableArgument($intersectionTable);
+        $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $intersectionTable, $mRuleKey);
+        $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $intersectionTable, $nRuleKey);
+        
+        if (!$this->rowGateway->isNew()) {
+            // If this row is already saved, set foreign key values in dependent row
+            foreach ($nTableConstraint['COLUMNS'] as $colPos => $column) {
+                $iRowData[$column] = $this->rowGateway->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos]);
+            }
+        }
+        $iRow = $intersectionTable->createRow($iRowData);
+        $mRow = $mTable->createRow($mRowData);
+        // No foreign key yet!
+        
+        $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
+        
+        return $mRow;
+    }
     
 }
