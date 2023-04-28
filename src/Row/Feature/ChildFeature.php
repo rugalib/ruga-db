@@ -11,6 +11,7 @@ use Laminas\Db\Sql\Where;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\ResultSet\ResultSet;
 use Ruga\Db\Row\Exception\FeatureMissingException;
+use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
@@ -28,25 +29,6 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     
     
     
-    private function getMetadataFeature(): MetadataFeature
-    {
-        if ($this->metadataFeature === null) {
-            $this->metadataFeature = $this->rowGateway->getTableGateway()->getFeatureSet()->getFeatureByClassName(
-                MetadataFeature::class
-            );
-            if (!$this->metadataFeature || !($this->metadataFeature instanceof MetadataFeature)) {
-                throw new \Exception(
-                    get_class($this) . " requires " . MetadataFeature::class . " in " . get_class(
-                        $this->getTableGateway()
-                    )
-                );
-            }
-        }
-        return $this->metadataFeature;
-    }
-    
-    
-    
     public function postInitialize()
     {
         if (!$this->rowGateway instanceof ChildFeatureAttributesInterface) {
@@ -57,80 +39,90 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     }
     
     
-    private function saveDependentRows()
+    
+    public function preSave()
     {
-        foreach ($this->dependentRows as $constraintName => $dependentRows) {
-            foreach ($dependentRows as $uniqueid => $dependentRowInfo) {
-                /** @var RowInterface $dependentRow */
-                $dependentRow=$dependentRowInfo['dependentRow'];
+        // Check if all parents are non-new
+        $aNewParentRows = [];
+        foreach ($this->parentRows as $constraintName => $parentRows) {
+            foreach ($parentRows as $uniqueid => $parentRowInfo) {
+                /** @var RowInterface $parentRow */
+                $parentRow = $parentRowInfo['dependentRow'];
                 
-                if($dependentRowInfo['action'] == 'save') {
-                    if(!$this->rowGateway->isNew()) {
-                        // If parent row is already saved, set foreign key values in dependent row
-                        $dependentTableConstraint = $this->getParentTableConstraint($this->resolveTableArgument($dependentRow), $constraintName);
-                        foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
-                            $dependentRow->offsetSet($column, $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]));
-                        }
+                if ($parentRowInfo['action'] == 'save') {
+                    if ($parentRow->isNew()) {
+                        $aNewParentRows[] = $parentRow;
                     } else {
-                        throw new \RuntimeException('Parent row must be saved first');
+                        // Update foreign key
+                        $parentTable = $this->resolveTableArgument($parentRow);
+                        $parentTableConstraint = $this->getParentTableConstraint($parentTable, $constraintName);
+                        foreach ($parentTableConstraint['COLUMNS'] as $colPos => $column) {
+                            $this->rowGateway->offsetSet(
+                                $column,
+                                $parentRow->offsetGet($parentTableConstraint['REF_COLUMNS'][$colPos])
+                            );
+                        }
                     }
-                    $dependentRow->save();
                 }
-                if($dependentRowInfo['action'] == 'delete') {
-                    $dependentRow->delete();
+                if ($parentRowInfo['action'] == 'unlink') {
+                    // Clear foreign key
+                    $parentTable = $this->resolveTableArgument($parentRow);
+                    $parentTableConstraint = $this->getParentTableConstraint($parentTable, $constraintName);
+                    foreach ($parentTableConstraint['COLUMNS'] as $colPos => $column) {
+                        $this->rowGateway->offsetSet(
+                            $column,
+                            null
+                        );
+                    }
+                }
+                if ($parentRowInfo['action'] == 'delete') {
+                    $parentRow->delete();
                 }
             }
         }
+        if (count($aNewParentRows) > 0) {
+            throw new InvalidForeignKeyException(
+                'Parent row must be saved to database first (' . implode(
+                    ', ',
+                    array_map(static fn($item) => get_class($item), $aNewParentRows)
+                ) . ').'
+            );
+        }
     }
     
-    
-    /**
-     * Before this (parent) row is updated, save all dependent (child) rows.
-     *
-     * @return void
-     * @throws \Exception
-     */
-    public function preUpdate()
-    {
-        \Ruga\Log::functionHead($this);
-//        $this->saveDependentRows();
-    }
-    
-    
-    
-    /**
-     * After this (parent) row is inserted, save all dependent (child) rows.
-     *
-     * @return void
-     * @throws \Exception
-     */
-    public function postInsert()
-    {
-        \Ruga\Log::functionHead($this);
-//        $this->saveDependentRows();
-    }
     
     
     public function postSave()
     {
         // Successfully saved => delete dependent row list
-//        $this->dependentRows=[];
+        $this->parentRows = [];
     }
     
     
-    private function parentRowListAdd(RowInterface $parentRow, string $constraintName, string $action='save')
+    
+    /**
+     * Add $parentRow to the internal list of parents.
+     *
+     * @param RowInterface $parentRow
+     * @param string       $constraintName
+     * @param string       $action
+     *
+     * @return void
+     */
+    public function parentRowListAdd(RowInterface $parentRow, string $constraintName, string $action = 'save')
     {
-        $uniqueid=implode('-', $parentRow->primaryKeyData ?? []);
-        if(empty($uniqueid)) {
-            $uniqueid='?' . date('U') . '?' . sprintf('%05u', count($this->parentRows));
+        $uniqueid = implode('-', $parentRow->primaryKeyData ?? []);
+        if (empty($uniqueid)) {
+            $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->parentRows));
         }
         
-        $uniqueid.='@' . get_class($parentRow);
+        $uniqueid .= '@' . get_class($parentRow);
         
-        $this->parentRows[$constraintName][$uniqueid]['uniqueid']=$uniqueid;
-        $this->parentRows[$constraintName][$uniqueid]['action']=$action;
-        $this->parentRows[$constraintName][$uniqueid]['dependentRow']=$parentRow;
+        $this->parentRows[$constraintName][$uniqueid]['uniqueid'] = $uniqueid;
+        $this->parentRows[$constraintName][$uniqueid]['action'] = $action;
+        $this->parentRows[$constraintName][$uniqueid]['dependentRow'] = $parentRow;
     }
+    
     
     
     /**
@@ -173,7 +165,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      */
     private function resolveParentTableConstraints(TableInterface $parentTable, ?string $ruleKey = null): array
     {
-        $dependentTable=$this->rowGateway->getTableGateway();
+        $dependentTable = $this->rowGateway->getTableGateway();
         
         // Check table for Metadata feature
         if (!$dependentTable->getFeatureSet()->getFeatureByClassName(MetadataFeature::class)) {
@@ -219,7 +211,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      *
      * @return array
      */
-    public function getParentTableConstraint(TableInterface $parentTable, ?string $ruleKey = null): array
+    private function getParentTableConstraint(TableInterface $parentTable, ?string $ruleKey = null): array
     {
         $parentTableConstraints = $this->resolveParentTableConstraints($parentTable, $ruleKey);
         if (count($parentTableConstraints) > 1) {
@@ -236,20 +228,40 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         
         return array_shift($parentTableConstraints);
     }
-
-
+    
+    
+    
+    /**
+     * If parent row implements ParentFeature, store a reference to this dependent row in parent.
+     *
+     * @param RowInterface $parentRow
+     * @param string       $constraintName
+     *
+     * @return void
+     */
+    private function addChildToParent(RowInterface $parentRow, string $constraintName, string $action = 'save')
+    {
+        if ($parentRow instanceof ParentFeatureAttributesInterface) {
+            $parentRow->dependentRowListAdd($this->rowGateway, $constraintName, $action);
+        }
+    }
+    
+    
+    
     /**
      * Find the parent row.
      *
-     * @param $parentTable
+     * @param             $parentTable
      * @param string|null $ruleKey
      * @param Select|null $select
+     *
      * @return RowInterface
      * @throws \Exception
      */
     public function findParentRow($parentTable, ?string $ruleKey = null, ?Select $select = null): RowInterface
     {
         $parentTable = $this->resolveTableArgument($parentTable);
+        $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
         
         if ($select === null) {
             $select = $parentTable->getSql()->select();
@@ -264,7 +276,6 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         
         // add the dependent where
         $row = $this->rowGateway;
-        $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
         $select->where(
             function (Where $where) use ($parentTableConstraint, $row) {
                 $n = $where->NEST;
@@ -280,9 +291,125 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         }
         
         \Ruga\Log::addLog("SQL={$select->getSqlString($parentTable->getAdapter()->getPlatform())}");
-        $parentRow=$parentTable->selectWith($select)->current();
+        $parentRow = $parentTable->selectWith($select)->current();
         
+        // Add parent row to list
         $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME']);
+        $this->addChildToParent($parentRow, $parentTableConstraint['NAME']);
+        
+        return $parentRow;
+    }
+    
+    
+    
+    /**
+     * Create a new parent row.
+     *
+     * @param             $parentTable
+     * @param array       $rowData
+     * @param string|null $ruleKey
+     *
+     * @return RowInterface
+     * @throws \ReflectionException
+     */
+    public function createParentRow($parentTable, array $rowData = [], ?string $ruleKey = null): RowInterface
+    {
+        $parentTable = $this->resolveTableArgument($parentTable);
+        $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
+        
+        $parentRow = $parentTable->createRow($rowData);
+        // No foreign key yet!
+        
+        // Add parent row to list
+        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME']);
+        $this->addChildToParent($parentRow, $parentTableConstraint['NAME']);
+        
+        return $parentRow;
+    }
+    
+    
+    
+    /**
+     * Delete the parent row. The delete is done, when the dependent row is saved.
+     *
+     * @param             $parentTable
+     * @param string|null $ruleKey
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function deleteParentRow($parentTable, ?string $ruleKey = null)
+    {
+        $parentTable = $this->resolveTableArgument($parentTable);
+        $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
+        $parentRow = $this->unlinkParentRow($parentTable, $ruleKey);
+        
+        // Add parent row to list
+        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME'], 'delete');
+        $this->addChildToParent($parentRow, $parentTableConstraint['NAME'], 'unlink');
+    }
+    
+    
+    
+    /**
+     * Link parent to this dependent row.
+     *
+     * @param RowInterface $parentRow
+     * @param string|null  $ruleKey
+     *
+     * @return RowInterface
+     * @throws \Exception
+     */
+    public function linkParentRow(RowInterface $parentRow, ?string $ruleKey = null): RowInterface
+    {
+        $parentTable = $this->resolveTableArgument($parentRow);
+        $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
+        
+        if (!$parentRow->isNew()) {
+            // If parent row is already saved, set foreign key values in dependent row
+            foreach ($parentTableConstraint['COLUMNS'] as $colPos => $column) {
+                $this->rowGateway->offsetSet(
+                    $column,
+                    $parentRow->offsetGet($parentTableConstraint['REF_COLUMNS'][$colPos])
+                );
+            }
+        }
+        
+        // Add parent row to list
+        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME']);
+        $this->addChildToParent($parentRow, $parentTableConstraint['NAME']);
+        
+        return $parentRow;
+    }
+    
+    
+    
+    /**
+     * Remove relation between this row and the given parent.
+     *
+     * @param mixed       $parentTable
+     * @param string|null $ruleKey
+     *
+     * @return RowInterface
+     * @throws \Exception
+     */
+    public function unlinkParentRow($parentTable, ?string $ruleKey = null): RowInterface
+    {
+        $parentTable = $this->resolveTableArgument($parentTable);
+        $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
+        
+        $parentRow = $this->findParentRow($parentTable, $ruleKey);
+        foreach ($parentTableConstraint['COLUMNS'] as $colPos => $column) {
+            $this->rowGateway->offsetSet(
+                $column,
+                null
+            );
+        }
+        
+        // Add parent row to list
+        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME'], 'unlink');
+        $this->addChildToParent($parentRow, $parentTableConstraint['NAME'], 'unlink');
+        
         return $parentRow;
     }
     

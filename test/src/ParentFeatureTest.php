@@ -231,30 +231,34 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     public function testCanUnlinkDependentRow()
     {
-        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
-        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
-        $row = $t->findById(5)->current();
-        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
-        $this->assertSame('5', "{$row->id}");
-        $this->assertSame('data 5', $row->data);
+        $parentTable = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $parentRow */
+        $parentRow = $parentTable->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $parentRow);
+        $this->assertSame('5', "{$parentRow->id}");
+        $this->assertSame('data 5', $parentRow->data);
         
         $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
         $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
         
-        $row->linkDependentRow($dependentRow);
+        $parentRow->linkDependentRow($dependentRow);
         $dependentRow->save();
         unset($dependentRow);
         
-        $items = $row->findDependentRowset(MusterTable::class);
+        $items = $parentRow->findDependentRowset(MusterTable::class);
         $this->assertCount(2, $items);
         
-        $dependentRow = $row->findDependentRowset(MusterTable::class, null, (new Select())->where("`id`=1"))->current();
+        $dependentRow = $parentRow->findDependentRowset(
+            MusterTable::class,
+            null,
+            (new Select())->where("`id`=1")
+        )->current();
         $this->assertInstanceOf(Muster::class, $dependentRow);
         
-        $row->unlinkDependentRow($dependentRow);
+        $parentRow->unlinkDependentRow($dependentRow);
         $dependentRow->save();
         
-        $items = $row->findDependentRowset(MusterTable::class);
+        $items = $parentRow->findDependentRowset(MusterTable::class);
         $this->assertCount(1, $items);
     }
     
@@ -491,7 +495,8 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
         
         $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
-        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt testCanLinkNewDependentRowWithNewParent']);
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt testCanLinkNewDependentRowWithNewParent']
+        );
         
         $row->linkDependentRow($dependentRow);
         $row->save();
@@ -506,6 +511,7 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
     public function testCanLinkAndEditNewDependentRowWithNewParent()
     {
         $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
@@ -514,7 +520,8 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
         
         $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
-        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt testCanLinkNewDependentRowWithNewParent']);
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt testCanLinkNewDependentRowWithNewParent']
+        );
         
         $row->linkDependentRow($dependentRow);
         $dependentRow->offsetSet('fullname', 'This value has been changed by testCanLinkNewDependentRowWithNewParent');
