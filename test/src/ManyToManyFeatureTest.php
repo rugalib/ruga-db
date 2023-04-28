@@ -43,9 +43,30 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $nRow = $nTable->findById(1)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
         
-        $mRow = $nRow->createManyToManyRow(OrganizationTable::class, PartyHasOrganizationTable::class, ['name' => 'Kaufmann']);
+        $mRow = $nRow->createManyToManyRow(
+            OrganizationTable::class,
+            PartyHasOrganizationTable::class,
+            ['name' => 'Kaufmann']
+        );
         
         $nRow->save();
     }
+    
+    
+    
+    public function testCanLinkManyToManyRow()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(1)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        $mTable = new \Ruga\Db\Test\Model\OrganizationTable($this->getAdapter());
+        $mRow = $mTable->createRow(['name' => 'Kaufmann']);
+        
+        $nRow->linkManyToManyRow($mRow, PartyHasOrganizationTable::class);
+        $nRow->save();
+    }
+    
     
 }
