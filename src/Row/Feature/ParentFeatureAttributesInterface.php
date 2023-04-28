@@ -10,6 +10,7 @@ use Ruga\Db\Row\RowInterface;
 
 /**
  * Interface ParentFeatureAttributesInterface
+ * @see ParentFeature
  *
  * @method ResultSetInterface findDependentRowset($dependentTable, ?string $ruleKey = null, ?Select $select = null) Find dependent rows (children) in table $dependentTable
  * @method RowInterface createDependentRow($dependentTable, array $rowData = [], ?string $ruleKey = null) Create a new dependent row.

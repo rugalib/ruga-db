@@ -236,6 +236,8 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         // Find matching constraints in REFERENCEMAP
         foreach ($dependentTable::REFERENCEMAP ?? [] as $name => $constraint) {
             $constraint['NAME'] = $name;
+            $constraint['TABLE'] = $dependentTable->getTable();
+            $constraint['TABLE_CLASS'] = get_class($dependentTable);
             if ($constraint['REF_TABLE_CLASS']) {
                 $constraint['REF_TABLE'] = $constraint['REF_TABLE_CLASS']::TABLENAME;
             }
@@ -330,7 +332,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             function (Where $where) use ($dependentTableConstraint, $row) {
                 $n = $where->NEST;
                 foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
-                    $n->and->equalTo($column, $row->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]));
+                    $n->and->equalTo("{$dependentTableConstraint['TABLE']}.{$column}", $row->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]));
                 }
             }
         );

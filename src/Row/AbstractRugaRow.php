@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Ruga\Db\Row;
 
+use Ruga\Db\Row\Feature\ChildFeature;
+use Ruga\Db\Row\Feature\ChildFeatureAttributesInterface;
 use Ruga\Db\Row\Feature\CreateChangeFeature;
 use Ruga\Db\Row\Feature\CreateChangeFeatureAttributesInterface;
 use Ruga\Db\Row\Feature\DefaultValueFeature;
@@ -11,10 +13,14 @@ use Ruga\Db\Row\Feature\FeatureSet;
 use Ruga\Db\Row\Feature\FullnameFeature;
 use Ruga\Db\Row\Feature\FullnameFeatureAttributesInterface;
 use Ruga\Db\Row\Feature\FullnameFeatureRowInterface;
+use Ruga\Db\Row\Feature\ParentFeature;
+use Ruga\Db\Row\Feature\ParentFeatureAttributesInterface;
 
 abstract class AbstractRugaRow extends AbstractRow implements CreateChangeFeatureAttributesInterface,
-                                                               FullnameFeatureAttributesInterface,
-                                                               FullnameFeatureRowInterface
+                                                              FullnameFeatureAttributesInterface,
+                                                              FullnameFeatureRowInterface,
+                                                              ParentFeatureAttributesInterface,
+                                                              ChildFeatureAttributesInterface
 {
     /**
      * Add features to the row class before it is initialized by the parent.
@@ -28,7 +34,7 @@ abstract class AbstractRugaRow extends AbstractRow implements CreateChangeFeatur
         $featureSet->addFeature(new DefaultValueFeature());
         $featureSet->addFeature(new FullnameFeature());
         
-        if (class_exists($authFacade='\Ruga\Authentication\Facade\Auth', true)) {
+        if (class_exists($authFacade = '\Ruga\Authentication\Facade\Auth', true)) {
             $user = $authFacade::getIdentityFromSession();
             $user_id = isset($user['details']['id']) ? (int)$user['details']['id'] : 1;
         } else {
@@ -36,6 +42,8 @@ abstract class AbstractRugaRow extends AbstractRow implements CreateChangeFeatur
         }
 //        \Ruga\Log::log_msg(get_called_class() . '::initFeatures(): $user_id=' . $user_id);
         $featureSet->addFeature(new CreateChangeFeature($user_id));
+        $featureSet->addFeature(new ParentFeature());
+        $featureSet->addFeature(new ChildFeature());
         return parent::initFeatures($featureSet);
     }
     

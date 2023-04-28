@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Ruga\Db\Test;
+
+
+use Ruga\Db\Row\RowInterface;
+use Ruga\Db\Test\Model\OrganizationTable;
+use Ruga\Db\Test\Model\PartyHasOrganizationTable;
+
+/**
+ * @author Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
+ */
+class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
+{
+    
+    public function testCanFindParentRow()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(4)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+
+
+        $mRowset=$nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class);
+        
+        
+        
+        /** @var RowInterface $item */
+        foreach ($mRowset as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount(1, $mRowset);
+    }
+    
+    
+}

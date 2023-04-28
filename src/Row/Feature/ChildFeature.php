@@ -280,7 +280,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
             function (Where $where) use ($parentTableConstraint, $row) {
                 $n = $where->NEST;
                 foreach ($parentTableConstraint['REF_COLUMNS'] as $colPos => $column) {
-                    $n->and->equalTo($column, $row->offsetGet($parentTableConstraint['COLUMNS'][$colPos]));
+                    $n->and->equalTo("{$parentTableConstraint['REF_TABLE']}.{$column}", $row->offsetGet($parentTableConstraint['COLUMNS'][$colPos]));
                 }
             }
         );
