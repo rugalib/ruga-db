@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Ruga\Db\Test;
 
-
-use Ruga\Db\Row\Exception\InvalidForeignKeyException;
+use Laminas\Db\Adapter\Exception\InvalidQueryException;
 use Ruga\Db\Row\RowInterface;
-use Ruga\Db\Test\Model\CartTable;
 use Ruga\Db\Test\Model\Organization;
 use Ruga\Db\Test\Model\OrganizationTable;
 use Ruga\Db\Test\Model\PartyHasOrganization;
@@ -34,6 +32,23 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
             echo PHP_EOL;
         }
         $this->assertCount(1, $mRowset);
+    }
+    
+    
+    public function testCanFindManyToManyRowAndEditAndSaveThruNRow()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(4)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        /** @var Organization $mRow */
+        $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
+        $mRow->name='This row has been changed';
+        $nRow->save();
+        
+        $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
+        $this->assertSame('This row has been changed', $mRow->name);
     }
     
     
@@ -90,5 +105,40 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $nRow->save();
     }
     
+    
+    public function testCanNotUnlinkManyToManyRow()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(4)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        /** @var Organization $mRow */
+        $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
+        $this->assertInstanceOf(Organization::class, $mRow);
+        
+        $nRow->unlinkManyToManyRow($mRow, PartyHasOrganizationTable::class);
+        $this->expectException(InvalidQueryException::class);
+        $nRow->save();
+    }
+    
+    
+    public function testCanDeleteManyToManyRow()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(4)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        /** @var Organization $mRow */
+        $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
+        $this->assertInstanceOf(Organization::class, $mRow);
+        
+        $nRow->deleteManyToManyRow($mRow, PartyHasOrganizationTable::class);
+        $nRow->save();
+        
+        $mRowset = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class);
+        $this->assertCount(0, $mRowset);
+    }
     
 }

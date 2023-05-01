@@ -21,7 +21,7 @@ use Ruga\Db\Table\Feature\MetadataFeature;
 use Ruga\Db\Table\TableInterface;
 
 /**
- * The parent feature adds the ability to find, add and remove children
+ * The parent feature adds the ability to find, add and remove many-to-many relations.
  */
 class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttributesInterface
 {
@@ -42,6 +42,15 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     
     
     
+    /**
+     * Save (or delete) the associated match row.
+     *
+     * @param RowInterface $iRow
+     * @param array        $mRowsList
+     *
+     * @return void
+     * @throws \Exception
+     */
     private function saveMRow(RowInterface $iRow, array $mRowsList)
     {
         foreach ($mRowsList as $mConstraintName => $mRows) {
@@ -64,8 +73,21 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
                     }
                 }
                 if ($mRowInfo['action'] == 'unlink') {
+                    $mRow->save();
+                    
+                    // Update foreign key
+                    $iTable = $this->resolveTableArgument($iRow);
+                    $mTable = $this->resolveTableArgument($mRow);
+                    $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mConstraintName);
+                    foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
+                        $iRow->offsetSet(
+                            $column,
+                            null
+                        );
+                    }
                 }
                 if ($mRowInfo['action'] == 'delete') {
+                    $mRow->delete();
                 }
             }
         }
@@ -73,6 +95,12 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     
     
     
+    /**
+     * Save (or delete) intersection and match rows.
+     *
+     * @return void
+     * @throws \Exception
+     */
     private function saveIntersectionRow()
     {
         foreach ($this->manyToManyRows as $iConstraintName => $iRows) {
@@ -106,8 +134,25 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
                     $iRow->save();
                 }
                 if ($iRowInfo['action'] == 'unlink') {
+                    $this->saveMRow($iRow, $iRowInfo['m']);
+                    $iTable = $this->resolveTableArgument($iRow);
+                    $nTable = $this->resolveTableArgument($this->rowGateway);
+                    $iTableConstraint = $this->getManyToManyTableConstraint(
+                        $nTable,
+                        $iTable,
+                        $iConstraintName
+                    );
+                    foreach ($iTableConstraint['COLUMNS'] as $colPos => $column) {
+                        $iRow->offsetSet(
+                            $column,
+                            null
+                        );
+                    }
+                    $iRow->save();
                 }
                 if ($iRowInfo['action'] == 'delete') {
+                    $iRow->delete();
+                    $this->saveMRow($iRow, $iRowInfo['m']);
                 }
             }
         }
@@ -116,7 +161,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     
     
     /**
-     * Before this (parent) row is updated, save all dependent (child) rows.
+     * Before this (parent) row is updated, save all intersection (child) and match (intersection's parent) rows.
      *
      * @return void
      * @throws \Exception
@@ -130,7 +175,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     
     
     /**
-     * After this (parent) row is inserted, save all intersection (child) rows.
+     * After this (parent) row is inserted, save all intersection (child) and match (intersection's parent) rows.
      *
      * @return void
      * @throws \Exception
@@ -151,6 +196,18 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     
     
     
+    /**
+     * Save the relation to the internal row store.
+     *
+     * @param RowInterface $mRow
+     * @param RowInterface $iRow
+     * @param string       $mConstraintName
+     * @param string       $nConstraintName
+     * @param string       $action
+     *
+     * @return void
+     * @throws \Exception
+     */
     private function manyToManyRowListAdd(
         RowInterface $mRow,
         RowInterface $iRow,
@@ -275,6 +332,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      * Get exactly one matching parent-child-relation. Throws exceptions otherwise.
      *
      * @param TableInterface $parentTable
+     * @param TableInterface $dependentTable
      * @param string|null    $ruleKey
      *
      * @return array
@@ -388,9 +446,19 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         \Ruga\Log::addLog("SQL={$select->getSqlString($mTable->getAdapter()->getPlatform())}");
         $mRowset = $mTable->selectWith($select);
         
-        // Add parent row to list
-//        $this->manyToManyRowListAdd($parentRow, $parentTableConstraint['NAME']);
-//        $this->addChildToParent($parentRow, $parentTableConstraint['NAME']);
+        $a = [];
+        /** @var RowInterface $mRow */
+        foreach ($mRowset as $mRow) {
+            $a[] = $mRow;
+            $iRowset=$this->findIntersectionRows($mRow, $iTable, $nRuleKey, $mRuleKey);
+            /** @var RowInterface $iRow */
+            foreach($iRowset as $iRow) {
+                $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
+            }
+        }
+        
+        // Must re-initialize ResultSet to keep reference to the rows
+        $mRowset->initialize($a);
         
         return $mRowset;
     }
@@ -409,8 +477,13 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      * @return ResultSetInterface
      * @throws \Exception
      */
-    public function findIntersectionRows(RowInterface $mRow, $iTable, ?string $nRuleKey = null, ?string $mRuleKey = null, ?Select $select = null): ResultSetInterface
-    {
+    public function findIntersectionRows(
+        RowInterface $mRow,
+        $iTable,
+        ?string $nRuleKey = null,
+        ?string $mRuleKey = null,
+        ?Select $select = null
+    ): ResultSetInterface {
         $nTable = $this->rowGateway->getTableGateway();
         $mTable = $this->resolveTableArgument($mRow);
         $iTable = $this->resolveTableArgument($iTable);
@@ -461,6 +534,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         
         return $iRowset;
     }
+    
     
     
     /**
@@ -519,8 +593,13 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      * @return RowInterface
      * @throws \ReflectionException
      */
-    public function linkManyToManyRow(RowInterface $mRow, $iTable, array $iRowData = [], ?string $mRuleKey = null, ?string $nRuleKey = null): RowInterface
-    {
+    public function linkManyToManyRow(
+        RowInterface $mRow,
+        $iTable,
+        array $iRowData = [],
+        ?string $mRuleKey = null,
+        ?string $nRuleKey = null
+    ): RowInterface {
         $nTable = $this->rowGateway->getTableGateway();
         $mTable = $this->resolveTableArgument($mRow);
         $iTable = $this->resolveTableArgument($iTable);
@@ -557,19 +636,84 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     
     
     
-    public function deleteManyToManyRow(RowInterface $mRow, $iTable, ?string $mRuleKey = null, ?string $nRuleKey = null)
-    {
+    /**
+     * Unlink intersection and match row. Unlinking is done, when this row is saved. This does not delete the
+     * intersection row(s), but sets the foreign keys to NULL. If intersection row does not allow NULL values for the
+     * foreign keys this will likely throw an error.
+     *
+     * @param RowInterface $mRow
+     * @param              $iTable
+     * @param string|null  $mRuleKey
+     * @param string|null  $nRuleKey
+     * @param string       $action
+     *
+     * @return RowInterface
+     * @throws \Exception
+     */
+    public function unlinkManyToManyRow(
+        RowInterface $mRow,
+        $iTable,
+        ?string $mRuleKey = null,
+        ?string $nRuleKey = null,
+        string $action = 'unlink'
+    ): RowInterface {
         $nTable = $this->rowGateway->getTableGateway();
         $mTable = $this->resolveTableArgument($mRow);
         $iTable = $this->resolveTableArgument($iTable);
         $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mRuleKey);
         $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nRuleKey);
-
+        
         $iRows = $this->findIntersectionRows($mRow, $iTable);
-
-//        $this->unlinkManyToManyRow();
-
-//        $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
+        /** @var RowInterface $iRow */
+        foreach ($iRows as $iRow) {
+            foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
+                $iRow->offsetSet(
+                    $column,
+                    null
+                );
+            }
+            
+            foreach ($nTableConstraint['COLUMNS'] as $colPos => $column) {
+                $iRow->offsetSet(
+                    $column,
+                    null
+                );
+            }
+            
+            $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME'], $action);
+        }
+        
+        return $mRow;
+    }
+    
+    
+    
+    /**
+     * Delete intersection and match row. Deletion is done, when this row is saved.
+     *
+     * @param RowInterface $mRow
+     * @param mixed        $iTable
+     * @param string|null  $mRuleKey
+     * @param string|null  $nRuleKey
+     *
+     * @return RowInterface
+     * @throws \Exception
+     */
+    public function deleteManyToManyRow(
+        RowInterface $mRow,
+        $iTable,
+        ?string $mRuleKey = null,
+        ?string $nRuleKey = null
+    ): RowInterface {
+//        $nTable = $this->rowGateway->getTableGateway();
+//        $mTable = $this->resolveTableArgument($mRow);
+//        $iTable = $this->resolveTableArgument($iTable);
+//        $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mRuleKey);
+//        $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nRuleKey);
+        
+        $this->unlinkManyToManyRow($mRow, $iTable, $mRuleKey, $nRuleKey, 'delete');
+        
+        return $mRow;
     }
     
 }
