@@ -87,6 +87,9 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         );
         
         $nRow->save();
+        
+        $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
+        $this->assertSame('Kaufmann', $mRow->name);
     }
     
     

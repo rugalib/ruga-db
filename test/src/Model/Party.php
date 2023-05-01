@@ -8,6 +8,7 @@ use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Feature\FeatureSet;
 use Ruga\Db\Row\Feature\ManyToManyFeature;
 use Ruga\Db\Row\Feature\ManyToManyFeatureAttributesInterface;
+use Ruga\Db\Row\Feature\TransactionFeature;
 
 /**
  * Implements the party entity.
@@ -20,6 +21,7 @@ class Party extends AbstractRugaRow implements ManyToManyFeatureAttributesInterf
     {
         $featureSet=parent::initFeatures($featureSet);
         $featureSet->addFeature(new ManyToManyFeature());
+        $featureSet->addFeature(new TransactionFeature());
         return $featureSet;
     }
     

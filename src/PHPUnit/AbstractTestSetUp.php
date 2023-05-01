@@ -9,6 +9,7 @@ use Laminas\ServiceManager\ServiceManager;
 use PHPUnit\Framework\TestCase;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\Adapter\AdapterFactory;
+use Ruga\Db\Adapter\AdapterInterface;
 use Ruga\Db\Schema\Updater;
 
 /**
@@ -28,7 +29,7 @@ abstract class AbstractTestSetUp extends TestCase
     
     protected function setUp(): void
     {
-        $adapter = new \Ruga\Db\Adapter\Adapter($this->getConfig()['db']);
+        $adapter = $this->getAdapter();
         
         $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
         
@@ -102,7 +103,8 @@ abstract class AbstractTestSetUp extends TestCase
     public function getAdapter(): Adapter
     {
         if (!$this->adapter) {
-            $this->adapter = (new AdapterFactory())($this->getContainer(), Adapter::class, null);
+//            $this->adapter = (new AdapterFactory())($this->getContainer(), Adapter::class, null);
+            $this->adapter = $this->getContainer()->get(AdapterInterface::class);
         }
         return $this->adapter;
     }

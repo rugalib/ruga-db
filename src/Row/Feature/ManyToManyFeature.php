@@ -263,6 +263,8 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         
         if (is_string($table)) {
             $table = $adapter->tableFactory($table);
+//            $tableName=get_class($table);
+//            $table=new $tableName($adapter);
         } elseif ($table instanceof RowInterface) {
             $table = $table->getTableGateway();
         }

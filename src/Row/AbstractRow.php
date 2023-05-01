@@ -25,7 +25,6 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
 //    protected $featureSet = null;
     
     
-    
     /**
      * Construct the row object. Calls initFeatures() before giving control to parent.
      *
@@ -70,32 +69,42 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      * @return int Affected Rows
      * @throws \Exception
      */
-    public function save()
+    public function save(): int
     {
         \Ruga\Log::functionHead($this);
-        $rowExistsInDatabase = $this->rowExistsInDatabase();
-        
-        $this->featureSet->apply('preSave', []);
-        if ($rowExistsInDatabase) {
-            $this->featureSet->apply('preUpdate', []);
-        } else {
-            $this->featureSet->apply('preInsert', []);
-        }
-        
+        $rowExistsInDatabase = null;
         try {
+            $this->featureSet->apply('startSave', []);
+            
+            $rowExistsInDatabase = $this->rowExistsInDatabase();
+            
+            $this->featureSet->apply('preSave', []);
+            if ($rowExistsInDatabase) {
+                $this->featureSet->apply('preUpdate', []);
+            } else {
+                $this->featureSet->apply('preInsert', []);
+            }
+            
             // Save and return affected rows
             return parent::save();
         } catch (\Exception $e) {
+            $this->featureSet->apply('catchSaveException', [$e]);
             // Throw exception, if something went wrong
             throw $e;
         } finally {
             // Run post-* feature handlers before returning affected rows from save()
+            
             if ($rowExistsInDatabase) {
                 $this->featureSet->apply('postUpdate', []);
+//                if (isset($e)) $this->featureSet->apply('postUpdateException', [$e]);
             } else {
                 $this->featureSet->apply('postInsert', []);
+//                if (isset($e)) $this->featureSet->apply('postInsertException', [$e]);
             }
             $this->featureSet->apply('postSave', []);
+//            if (isset($e)) $this->featureSet->apply('postSaveException', [$e]);
+            $this->featureSet->apply('endSave', []);
+//            if (isset($e)) $this->featureSet->apply('endSaveException', [$e]);
         }
     }
     
@@ -356,7 +365,11 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
         if ($this->featureSet && $this->featureSet->canCallMagicCall($name)) {
             return $this->featureSet->callMagicCall($name, $arguments);
         }
-        trigger_error('Call to undefined method '.__CLASS__.'::'.$name.'(). Missing feature in ' . get_called_class() . '?', E_USER_ERROR);
+        trigger_error(
+            'Call to undefined method ' . __CLASS__ . '::' . $name . '(). Missing feature in ' . get_called_class(
+            ) . '?',
+            E_USER_ERROR
+        );
     }
     
     
@@ -371,7 +384,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      */
     public function getFullname(): string
     {
-        $str=$this->offsetExists('fullname')
+        $str = $this->offsetExists('fullname')
             ? $this->offsetGet('fullname')
             : ($this->offsetExists('name') ? $this->offsetGet('name') : $this->uniqueid);
         
@@ -854,7 +867,9 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
                     $metadataFeature->getMetadata()['columns'][$offset]
                 )) {
                 throw new Exception\NoDefaultValueException(
-                    "Column '{$offset}' has no default value in '" . get_class($this) . "' (Is DefaultValueFeature loaded in row?)."
+                    "Column '{$offset}' has no default value in '" . get_class(
+                        $this
+                    ) . "' (Is DefaultValueFeature loaded in row?)."
                 );
             }
         } else {
@@ -923,7 +938,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
     
     
     /**
-     * @param string $name  Name of the column
+     * @param string $name Name of the column
      * @param mixed  $value Value of the column
      *
      * @return void

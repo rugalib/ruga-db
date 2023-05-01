@@ -12,12 +12,19 @@ use Ruga\Db\Row\Exception\InvalidArgumentException;
  * @method postInitialize()
  * @method prePopulate(array &$rowData, bool &$rowExistsInDatabase)
  * @method postPopulate()
- * @method preSave()
- * @method postSave()
- * @method preInsert()
- * @method postInsert()
- * @method preUpdate()
- * @method postUpdate()
+ * @method void startSave() First event if save() is called.
+ * @method void preSave() Event is called before saving, but after startSave().
+ * @method void preUpdate() Called before UPDATE command is issued.
+ * @method void preInsert() Called before INSERT command is issued.
+ * @method void catchSaveException(\Throwable $exception) Called immediately after exception has been thrown.
+ * @method void postUpdate() Called after UPDATE command was issued.
+// * @method void postUpdateException(\Throwable $exception) Called after UPDATE command, when exception occurred.
+ * @method void postInsert() Called after INSERT command was issued.
+// * @method void postInsertException(\Throwable $exception) Called after INSERT command, when exception occurred.
+ * @method void postSave() Called after saving.
+// * @method void postSaveException(\Throwable $exception) Called after saving, when exception occurred.
+ * @method void endSave() Called after saving and after postSave().
+// * @method void endSaveException(\Throwable $exception) Called after saving and after postSave(), when exception occurred.
  * @method preOffsetSet($offset, &$value)
  * @method preToArray(array &$dataarray)
  * @method postToArray(array &$dataarray)
