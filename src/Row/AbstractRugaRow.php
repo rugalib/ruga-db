@@ -13,6 +13,8 @@ use Ruga\Db\Row\Feature\FeatureSet;
 use Ruga\Db\Row\Feature\FullnameFeature;
 use Ruga\Db\Row\Feature\FullnameFeatureAttributesInterface;
 use Ruga\Db\Row\Feature\FullnameFeatureRowInterface;
+use Ruga\Db\Row\Feature\ManyToManyFeature;
+use Ruga\Db\Row\Feature\ManyToManyFeatureAttributesInterface;
 use Ruga\Db\Row\Feature\ParentFeature;
 use Ruga\Db\Row\Feature\ParentFeatureAttributesInterface;
 
@@ -20,7 +22,8 @@ abstract class AbstractRugaRow extends AbstractRow implements CreateChangeFeatur
                                                               FullnameFeatureAttributesInterface,
                                                               FullnameFeatureRowInterface,
                                                               ParentFeatureAttributesInterface,
-                                                              ChildFeatureAttributesInterface
+                                                              ChildFeatureAttributesInterface,
+                                                              ManyToManyFeatureAttributesInterface
 {
     /**
      * Add features to the row class before it is initialized by the parent.
@@ -44,6 +47,7 @@ abstract class AbstractRugaRow extends AbstractRow implements CreateChangeFeatur
         $featureSet->addFeature(new CreateChangeFeature($user_id));
         $featureSet->addFeature(new ParentFeature());
         $featureSet->addFeature(new ChildFeature());
+        $featureSet->addFeature(new ManyToManyFeature());
         return parent::initFeatures($featureSet);
     }
     
