@@ -323,7 +323,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      * n:m Beziehung.
      *
      * @param mixed       $mTable
-     * @param mixed       $intersectionTable
+     * @param mixed       $iTable
      * @param string|null $nRuleKey
      * @param string|null $mRuleKey
      * @param Select|null $select
@@ -333,16 +333,16 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      */
     public function findManyToManyRowset(
         $mTable,
-        $intersectionTable,
+        $iTable,
         ?string $nRuleKey = null,
         ?string $mRuleKey = null,
         ?Select $select = null
     ): ResultSetInterface {
         $nTable = $this->rowGateway->getTableGateway();
         $mTable = $this->resolveTableArgument($mTable);
-        $intersectionTable = $this->resolveTableArgument($intersectionTable);
-        $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $intersectionTable, $mRuleKey);
-        $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $intersectionTable, $nRuleKey);
+        $iTable = $this->resolveTableArgument($iTable);
+        $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mRuleKey);
+        $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nRuleKey);
         
         
         if ($select === null) {
@@ -365,7 +365,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
             $aOn[] = "{$mTableConstraint['TABLE']}.{$column}={$mTableConstraint['REF_TABLE']}.{$mTableConstraint['REF_COLUMNS'][$colPos]}";
         }
-        $select->join($intersectionTable->getTable(), implode(' AND ', $aOn), [], Select::JOIN_INNER);
+        $select->join($iTable->getTable(), implode(' AND ', $aOn), [], Select::JOIN_INNER);
         
         // Create where statement for $intersectionTable
         $select->where(
@@ -395,6 +395,72 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         return $mRowset;
     }
     
+    
+    
+    /**
+     * Find intersection rows from many-to-many relation.
+     *
+     * @param RowInterface $mRow
+     * @param mixed        $iTable
+     * @param string|null  $nRuleKey
+     * @param string|null  $mRuleKey
+     * @param Select|null  $select
+     *
+     * @return ResultSetInterface
+     * @throws \Exception
+     */
+    public function findIntersectionRows(RowInterface $mRow, $iTable, ?string $nRuleKey = null, ?string $mRuleKey = null, ?Select $select = null): ResultSetInterface
+    {
+        $nTable = $this->rowGateway->getTableGateway();
+        $mTable = $this->resolveTableArgument($mRow);
+        $iTable = $this->resolveTableArgument($iTable);
+        $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mRuleKey);
+        $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nRuleKey);
+        
+        if ($select === null) {
+            $select = $iTable->getSql()->select();
+        } else {
+            // Set table
+            $select->from($iTable->getTable());
+        }
+        
+        // save existing where
+        $existingWhere = $select->where;
+        $select->reset(Select::WHERE);
+        
+        
+        // add the dependent where
+        $nRow = $this->rowGateway;
+        
+        // Create where statement for $intersectionTable
+        $select->where(
+            function (Where $where) use ($nTableConstraint, $mTableConstraint, $nRow, $mRow) {
+                $n = $where->NEST;
+                foreach ($nTableConstraint['COLUMNS'] as $colPos => $column) {
+                    $n->and->equalTo(
+                        "{$nTableConstraint['TABLE']}.{$column}",
+                        $nRow->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos])
+                    );
+                }
+                foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
+                    $n->and->equalTo(
+                        "{$mTableConstraint['TABLE']}.{$column}",
+                        $mRow->offsetGet($mTableConstraint['REF_COLUMNS'][$colPos])
+                    );
+                }
+            }
+        );
+        
+        // add existing where at the end in parentheses
+        if ($existingWhere->count() > 0) {
+            $select->where->addPredicate($existingWhere);
+        }
+        
+        \Ruga\Log::addLog("SQL={$select->getSqlString($iTable->getAdapter()->getPlatform())}");
+        $iRowset = $iTable->selectWith($select);
+        
+        return $iRowset;
+    }
     
     
     /**
@@ -445,14 +511,15 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      * Link an existing $mRow to the $nRow using $iTable.
      *
      * @param RowInterface $mRow
-     * @param mixed             $iTable
+     * @param mixed        $iTable
+     * @param array        $iRowData
      * @param string|null  $mRuleKey
      * @param string|null  $nRuleKey
      *
      * @return RowInterface
      * @throws \ReflectionException
      */
-    public function linkManyToManyRow(RowInterface $mRow, $iTable, ?string $mRuleKey = null, ?string $nRuleKey = null): RowInterface
+    public function linkManyToManyRow(RowInterface $mRow, $iTable, array $iRowData = [], ?string $mRuleKey = null, ?string $nRuleKey = null): RowInterface
     {
         $nTable = $this->rowGateway->getTableGateway();
         $mTable = $this->resolveTableArgument($mRow);
@@ -460,7 +527,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mRuleKey);
         $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nRuleKey);
         
-        $iRow = $iTable->createRow();
+        $iRow = $iTable->createRow($iRowData);
         
         if (!$this->rowGateway->isNew()) {
             // If parent row is already saved, set foreign key values in dependent row
@@ -498,7 +565,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mRuleKey);
         $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nRuleKey);
 
-//        $iRows = $this->findIntersectionRows($this->rowGateway, $mRow, $iTable);
+        $iRows = $this->findIntersectionRows($mRow, $iTable);
 
 //        $this->unlinkManyToManyRow();
 

@@ -8,7 +8,9 @@ namespace Ruga\Db\Test;
 use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\RowInterface;
 use Ruga\Db\Test\Model\CartTable;
+use Ruga\Db\Test\Model\Organization;
 use Ruga\Db\Test\Model\OrganizationTable;
+use Ruga\Db\Test\Model\PartyHasOrganization;
 use Ruga\Db\Test\Model\PartyHasOrganizationTable;
 
 /**
@@ -17,7 +19,7 @@ use Ruga\Db\Test\Model\PartyHasOrganizationTable;
 class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
 {
     
-    public function testCanFindParentRow()
+    public function testCanFindManyToManyRow()
     {
         $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
         /** @var \Ruga\Db\Test\Model\Party $nRow */
@@ -32,6 +34,26 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
             echo PHP_EOL;
         }
         $this->assertCount(1, $mRowset);
+    }
+    
+    
+    
+    public function testCanFindIntersectionRow()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(4)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        /** @var Organization $mRow */
+        $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
+        $this->assertInstanceOf(Organization::class, $mRow);
+        
+        /** @var PartyHasOrganization $iRow */
+        $iRow = $nRow->findIntersectionRows($mRow, PartyHasOrganizationTable::class)->current();
+        print_r($iRow->idname);
+        echo PHP_EOL;
+        $this->assertInstanceOf(PartyHasOrganization::class, $iRow);
     }
     
     
