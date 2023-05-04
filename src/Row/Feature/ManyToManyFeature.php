@@ -222,7 +222,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         
         $iUniqueid = implode('-', $iRow->primaryKeyData ?? []);
         if (empty($iUniqueid)) {
-            $iUniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->manyToManyRows));
+            $iUniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->manyToManyRows[$nConstraintName] ?? []));
         }
         $iUniqueid .= '@' . get_class($iRow);
         
@@ -238,7 +238,12 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         
         $mUniqueid = implode('-', $mRow->primaryKeyData ?? []);
         if (empty($mUniqueid)) {
-            $mUniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->manyToManyRows));
+            $mUniqueid = '?' . date('U') . '?' . sprintf(
+                    '%05u',
+                    count(
+                        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName] ?? []
+                    )
+                );
         }
         $mUniqueid .= '@' . get_class($mRow);
         $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['uniqueid'] = $mUniqueid;
@@ -263,8 +268,6 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         
         if (is_string($table)) {
             $table = $adapter->tableFactory($table);
-//            $tableName=get_class($table);
-//            $table=new $tableName($adapter);
         } elseif ($table instanceof RowInterface) {
             $table = $table->getTableGateway();
         }
@@ -452,9 +455,9 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         /** @var RowInterface $mRow */
         foreach ($mRowset as $mRow) {
             $a[] = $mRow;
-            $iRowset=$this->findIntersectionRows($mRow, $iTable, $nRuleKey, $mRuleKey);
+            $iRowset = $this->findIntersectionRows($mRow, $iTable, $nRuleKey, $mRuleKey);
             /** @var RowInterface $iRow */
-            foreach($iRowset as $iRow) {
+            foreach ($iRowset as $iRow) {
                 $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
             }
         }

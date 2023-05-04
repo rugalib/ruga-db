@@ -17,12 +17,8 @@ use Ruga\Db\Table\TableInterface;
 abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
                                                          RowInterface /*, ArraySerializableInterface */
 {
-    private AbstractTable $tableGateway;
+    private TableInterface $tableGateway;
     
-    /**
-     * @var Feature\FeatureSet
-     */
-//    protected $featureSet = null;
     
     
     /**
@@ -86,25 +82,22 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
             }
             
             // Save and return affected rows
-            return parent::save();
+            $retval=parent::save();
+            
+            if ($rowExistsInDatabase) {
+                $this->featureSet->apply('postUpdate', []);
+            } else {
+                $this->featureSet->apply('postInsert', []);
+            }
+            $this->featureSet->apply('postSave', []);
+            
+            return $retval;
         } catch (\Exception $e) {
             $this->featureSet->apply('catchSaveException', [$e]);
             // Throw exception, if something went wrong
             throw $e;
         } finally {
-            // Run post-* feature handlers before returning affected rows from save()
-            
-            if ($rowExistsInDatabase) {
-                $this->featureSet->apply('postUpdate', []);
-//                if (isset($e)) $this->featureSet->apply('postUpdateException', [$e]);
-            } else {
-                $this->featureSet->apply('postInsert', []);
-//                if (isset($e)) $this->featureSet->apply('postInsertException', [$e]);
-            }
-            $this->featureSet->apply('postSave', []);
-//            if (isset($e)) $this->featureSet->apply('postSaveException', [$e]);
             $this->featureSet->apply('endSave', []);
-//            if (isset($e)) $this->featureSet->apply('endSaveException', [$e]);
         }
     }
     

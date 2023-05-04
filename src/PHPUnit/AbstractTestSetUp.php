@@ -29,7 +29,8 @@ abstract class AbstractTestSetUp extends TestCase
     
     protected function setUp(): void
     {
-        $adapter = $this->getAdapter();
+//        $adapter = $this->getAdapter();
+        $adapter = new \Ruga\Db\Adapter\Adapter($this->getConfig()['db']);
         
         $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
         
@@ -103,7 +104,6 @@ abstract class AbstractTestSetUp extends TestCase
     public function getAdapter(): Adapter
     {
         if (!$this->adapter) {
-//            $this->adapter = (new AdapterFactory())($this->getContainer(), Adapter::class, null);
             $this->adapter = $this->getContainer()->get(AdapterInterface::class);
         }
         return $this->adapter;

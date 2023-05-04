@@ -162,7 +162,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         
         $uniqueid = implode('-', $dependentRow->primaryKeyData ?? []);
         if (empty($uniqueid)) {
-            $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->dependentRows));
+            $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->dependentRows[$constraintName] ?? []));
         }
         
         $uniqueid .= '@' . get_class($dependentRow);

@@ -8,6 +8,7 @@ use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Feature\ChildFeature;
 use Ruga\Db\Row\Feature\ChildFeatureAttributesInterface;
 use Ruga\Db\Row\Feature\FeatureSet;
+use Ruga\Db\Row\Feature\TransactionFeature;
 
 class Muster extends AbstractRugaRow implements MusterAttributesInterface, ChildFeatureAttributesInterface
 {
@@ -15,6 +16,7 @@ class Muster extends AbstractRugaRow implements MusterAttributesInterface, Child
     {
         $featureSet=parent::initFeatures($featureSet);
         $featureSet->addFeature(new ChildFeature());
+        $featureSet->addFeature(new TransactionFeature());
         return $featureSet;
     }
 }

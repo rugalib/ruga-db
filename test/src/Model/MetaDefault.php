@@ -9,6 +9,7 @@ use Ruga\Db\Row\Feature\DefaultValueFeature;
 use Ruga\Db\Row\Feature\FeatureSet;
 use Ruga\Db\Row\Feature\ParentFeature;
 use Ruga\Db\Row\Feature\ParentFeatureAttributesInterface;
+use Ruga\Db\Row\Feature\TransactionFeature;
 
 class MetaDefault extends AbstractRow implements MetaDefaultAttributesInterface, ParentFeatureAttributesInterface
 {
@@ -24,6 +25,7 @@ class MetaDefault extends AbstractRow implements MetaDefaultAttributesInterface,
         $featureSet=parent::initFeatures($featureSet);
         $featureSet->addFeature(new DefaultValueFeature());
         $featureSet->addFeature(new ParentFeature());
+        $featureSet->addFeature(new TransactionFeature());
         return $featureSet;
     }
     

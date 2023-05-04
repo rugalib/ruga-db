@@ -113,7 +113,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     {
         $uniqueid = implode('-', $parentRow->primaryKeyData ?? []);
         if (empty($uniqueid)) {
-            $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->parentRows));
+            $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->parentRows[$constraintName] ?? []));
         }
         
         $uniqueid .= '@' . get_class($parentRow);

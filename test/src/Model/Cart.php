@@ -8,6 +8,7 @@ use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Feature\FeatureSet;
 use Ruga\Db\Row\Feature\ParentFeature;
 use Ruga\Db\Row\Feature\ParentFeatureAttributesInterface;
+use Ruga\Db\Row\Feature\TransactionFeature;
 
 class Cart extends AbstractRugaRow implements CartAttributesInterface, ParentFeatureAttributesInterface
 {
@@ -15,6 +16,7 @@ class Cart extends AbstractRugaRow implements CartAttributesInterface, ParentFea
     {
         $featureSet=parent::initFeatures($featureSet);
         $featureSet->addFeature(new ParentFeature());
+        $featureSet->addFeature(new TransactionFeature());
         return $featureSet;
     }
     
