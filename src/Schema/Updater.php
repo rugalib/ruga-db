@@ -490,11 +490,13 @@ abstract class Updater
      */
     public static function update(Adapter $adapter, array $config)
     {
+        static::getResolver($adapter, $config);
+        
+        $config=$config['db'] ?? $config;
+
         if (!is_array($config) || !isset($config[Updater::class])) {
             throw new OutOfBoundsException("Key '" . Updater::class . " not found in configuration.");
         }
-        
-        static::getResolver($adapter, $config);
         
         // Initialize data base
         static::initDatabase($adapter, $config);

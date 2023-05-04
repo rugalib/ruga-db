@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Ruga\Db\Schema;
 
+use Laminas\Db\TableGateway\TableGatewayInterface;
 use Ruga\Db\Table\TableInterface;
 
 /**
@@ -25,8 +26,28 @@ class Resolver
      */
     public function __construct($adapter, $config)
     {
+        foreach ($config['dependencies']['aliases'] ?? [] as $name => $class) {
+            if (is_a($class, TableGatewayInterface::class, true)) {
+                if (!isset($this->tables[$class])) {
+                    $this->tables[$class] = $class;
+                }
+                if (!isset($this->tables[$name])) {
+                    $this->tables[$name] = $class;
+                }
+            }
+        }
+        
         $this->config = $config['db'] ?? $config ?? [];
         $this->adapter = $adapter;
+        
+        foreach ($this->config[Updater::class][Updater::CONF_TABLES] ?? [] as $name => $class) {
+            if (!isset($this->tables[$class])) {
+                $this->tables[$class] = $class;
+            }
+            if (!isset($this->tables[$name])) {
+                $this->tables[$name] = $class;
+            }
+        }
         
         foreach ($this->config[Updater::class][Updater::CONF_TABLES] ?? [] as $name => $class) {
             if (!isset($this->tables[$class])) {

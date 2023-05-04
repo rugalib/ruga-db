@@ -65,7 +65,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      * @return int Affected Rows
      * @throws \Exception
      */
-    public function save(): int
+    public function save()
     {
         \Ruga\Log::functionHead($this);
         $rowExistsInDatabase = null;

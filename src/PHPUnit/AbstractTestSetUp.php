@@ -63,7 +63,7 @@ abstract class AbstractTestSetUp extends TestCase
         // Start schema updater
         \Ruga\Db\Schema\Updater::update(
             $adapter,
-            $this->getConfig()['db']
+            $this->getConfig()
         );
     }
     

@@ -35,6 +35,9 @@ class Adapter2Test extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         
         $table = $adapter->tableFactory('Simple');
         $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaTable::class, $table);
+        
+        $table = $adapter->tableFactory('Mem');
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MemberTable::class, $table);
     }
     
     
