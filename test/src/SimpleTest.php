@@ -22,7 +22,7 @@ class SimpleTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         /** @var \Ruga\Db\Test\Model\Simple $row */
         $row = $t->findById(1)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Simple::class, $row);
-        $this->assertSame('1', $row->id);
+        $this->assertSame(1, $row->id);
         $this->assertSame('data 1', $row->data);
     }
     

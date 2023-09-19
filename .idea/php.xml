@@ -61,7 +61,6 @@
       <path value="$PROJECT_DIR$/vendor/laminas/laminas-config" />
       <path value="$PROJECT_DIR$/vendor/laminas/laminas-cache-storage-adapter-memory" />
       <path value="$PROJECT_DIR$/vendor/webmozart/assert" />
-      <path value="$PROJECT_DIR$/vendor/stella-maris/clock" />
       <path value="$PROJECT_DIR$/vendor/psr/clock" />
       <path value="$PROJECT_DIR$/vendor/laminas/laminas-cache-storage-deprecated-factory" />
       <path value="$PROJECT_DIR$/vendor/laminas/laminas-cache-storage-adapter-filesystem" />

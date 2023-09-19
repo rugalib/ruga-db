@@ -23,7 +23,7 @@ class FullnameTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         /** @var \Ruga\Db\Test\Model\Fullname $row */
         $row = $t->findById(1)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Fullname::class, $row);
-        $this->assertSame('1', $row->id);
+        $this->assertSame(1, $row->id);
         $this->assertSame('data 1', $row->data);
     }
     

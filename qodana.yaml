@@ -27,4 +27,4 @@ script:
   name: php-migration
   parameters:
     fromLevel: 7.4
-    toLevel: 8.1
+    toLevel: 8.2
