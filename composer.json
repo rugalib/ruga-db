@@ -1,7 +1,7 @@
 {
   "name": "rugalib/ruga-db",
   "description": "Data base abstraction",
-  "license": "BSD-3-Clause",
+  "license": "AGPL-3.0-only",
   "homepage": "https://github.com/rugalib",
   "type": "library",
   "require": {
@@ -15,15 +15,18 @@
     "laminas/laminas-cache": "^2.9",
     "laminas/laminas-serializer": "^2.9",
     "rugalib/ruga-log": "^1.0"
+    "rugalib/ruga-std": "^1.0"
   },
   "require-dev": {
     "ext-bcmath": "*",
     "ext-pdo": "*",
-    "phpunit/phpunit": "^9"
+    "phpunit/phpunit": "^9.6"
   },
   "repositories": [
-    {"type": "vcs", "url": "https://github.com/rugalib/ruga-std.git"},
-    {"type": "vcs", "url": "https://github.com/rugalib/ruga-log.git"}
+    {
+      "type": "composer",
+      "url": "https://packages.rugalib.ch/"
+    }
   ],
   "authors": [
     {
