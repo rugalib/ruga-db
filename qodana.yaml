@@ -30,3 +30,9 @@ php:
 
 #Specify Qodana linter for analysis (Applied in CI/CD pipeline)
 linter: jetbrains/qodana-php:latest
+
+script:
+  name: php-migration
+  parameters:
+    fromLevel: 7.4
+    toLevel: 8.0
