@@ -145,6 +145,7 @@ class UpdaterTest extends TestCase
         $config['db'][\Ruga\Db\Schema\Updater::class][\Ruga\Db\Schema\Updater::CONF_REQUESTED_VERSION] = 2;
         
         $adapter = new Adapter($config['db']);
+        $adapter->query('SET SESSION sql_mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"')->execute();
         $this->assertInstanceOf(AdapterInterface::class, $adapter);
         
         $this->expectException(\Ruga\Db\Schema\Exception\SchemaUpdateFailedException::class);

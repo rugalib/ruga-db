@@ -19,20 +19,12 @@ profile:
 #      - <path/where/not/run/inspection>
 
 php:
-  version: 7.4 #(Applied in CI/CD pipeline)
+  version: 7.4
 
-#Execute shell command before Qodana execution (Applied in CI/CD pipeline)
-#bootstrap: sh ./prepare-qodana.sh
-
-#Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
-#plugins:
-#  - id: <plugin.id> #(plugin id can be found at https://plugins.jetbrains.com)
-
-#Specify Qodana linter for analysis (Applied in CI/CD pipeline)
 linter: jetbrains/qodana-php:latest
 
 script:
   name: php-migration
   parameters:
     fromLevel: 7.4
-    toLevel: 8.0
+    toLevel: 8.1

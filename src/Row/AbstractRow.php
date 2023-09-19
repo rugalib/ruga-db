@@ -398,11 +398,11 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      * @param $offset string Name of the column
      * @param $value  mixed Value to set the column to
      *
-     * @return bool
+     * @return string
      */
-    private function offsetSet_bit($offset, $value): bool
+    private function offsetSet_bit($offset, $value): int
     {
-        return boolval($value) ? '1' : '0';
+        return boolval($value) ? 1 : 0;
     }
     
     

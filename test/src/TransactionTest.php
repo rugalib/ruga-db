@@ -41,6 +41,7 @@ class TransactionTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     public function testCanNotCreateNewManyToManyRow()
     {
+        $this->getAdapter()->query('SET SESSION sql_mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"')->execute();
         $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
         /** @var \Ruga\Db\Test\Model\Party $nRow */
         $nRow = $nTable->findById(1)->current();
@@ -50,7 +51,7 @@ class TransactionTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
             OrganizationTable::class,
             PartyHasOrganizationTable::class,
             ['name' => 'Kaufmann'],
-            ['organization_role' => 'THIS_DOES_NOT_EXIST']
+            ['organization_role' => 'THIS_DOES_NOT_EXIST']   // Unknown organisation_role
         );
         
         try {
@@ -71,6 +72,7 @@ class TransactionTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     public function testCanCreateNewDependentRowWithNewParent()
     {
+        $this->getAdapter()->query('SET SESSION sql_mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"')->execute();
         $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
         /** @var \Ruga\Db\Test\Model\MetaDefault $row */
         $row = $t->createRow(['data' => 'data 8 (new)']);
@@ -82,7 +84,7 @@ class TransactionTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         );
         $row->createDependentRow(
             MusterTable::class,
-            ['fullname' => 'Hallo Welt testCanCreateNewDependentRowWithNewParent 2', 'Tenant_id' => 'A']
+            ['fullname' => 'Hallo Welt testCanCreateNewDependentRowWithNewParent 2', 'Tenant_id' => 'A'] // 'A' should throw an error because the row is numeric
         );
         $row->createDependentRow(
             MusterTable::class,
