@@ -27,12 +27,12 @@ class TenantTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         /** @var \Ruga\Db\Test\Model\Simple $row */
         $row = $t->findById(1)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Simple::class, $row);
-        $this->assertSame(1, $row->id);
+        $this->assertSame(1, intval($row->id));
         $this->assertSame('data 1', $row->data);
         
         $row = $t->findById(4)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Simple::class, $row);
-        $this->assertSame(4, $row->id);
+        $this->assertSame(4, intval($row->id));
         $this->assertSame('data 4', $row->data);
         
         $row = $t->findById(6)->current();
@@ -52,17 +52,17 @@ class TenantTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         /** @var \Ruga\Db\Test\Model\Simple $row */
         $row = $t->findById(1)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Simple::class, $row);
-        $this->assertSame(1, $row->id);
+        $this->assertSame(1, intval($row->id));
         $this->assertSame('data 1', $row->data);
         
         $row = $t->findById(4)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Simple::class, $row);
-        $this->assertSame(4, $row->id);
+        $this->assertSame(4, intval($row->id));
         $this->assertSame('data 4', $row->data);
         
         $row = $t->findById(6)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Simple::class, $row);
-        $this->assertSame(6, $row->id);
+        $this->assertSame(6, intval($row->id));
         $this->assertSame('data 6', $row->data);
     }
     
@@ -103,7 +103,7 @@ class TenantTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertSame('new data 8', $row->data);
         $row->save();
         $this->assertSame('new data 8', $row->data);
-        $this->assertSame(1, $row->Tenant_id);
+        $this->assertSame(1, intval($row->Tenant_id));
     }
     
     
@@ -119,7 +119,7 @@ class TenantTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertSame('new data 8', $row->data);
         $row->save();
         $this->assertSame('new data 8', $row->data);
-        $this->assertSame(1, $row->Tenant_id);
+        $this->assertSame(1, intval($row->Tenant_id));
     }
     
     

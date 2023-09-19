@@ -20,7 +20,7 @@ class CreateChangeFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         /** @var \Ruga\Db\Test\Model\MemberCreateChange $row */
         $row = $t->findById(2)->current();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\MemberCreateChange::class, $row);
-        $this->assertSame(2, $row->id);
+        $this->assertSame(2, intval($row->id));
         $this->assertSame('Vreni Meier', $row->fullname);
     }
     
@@ -57,7 +57,7 @@ class CreateChangeFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         unset($row);
         $row = $t->findById(3)->current();
         $this->assertIsString($row->created);
-        $this->assertSame(1, $row->createdBy);
+        $this->assertSame(1, intval($row->createdBy));
         $this->assertSame('Peter', $row->first_name);
         $this->assertSame('', $row->fullname);
     }
