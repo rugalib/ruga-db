@@ -9,11 +9,13 @@ declare(strict_types=1);
 namespace Ruga\Db\Row\Feature;
 
 use Laminas\Db\ResultSet\ResultSetInterface;
+use Laminas\Db\Sql\ExpressionInterface;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
+use Ruga\Db\Row\Exception\NoDefaultValueException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
 use Ruga\Db\Table\Feature\MetadataFeature;
@@ -143,13 +145,22 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     public function postSave()
     {
         // Successfully saved => delete dependent row list
+        array_map(static fn($dependentRow) => $dependentRow->parentRowListClear(), $this->dependentRows);
+        $this->dependentRows = [];
+    }
+    
+    
+    
+    public function dependentRowListClear()
+    {
         $this->dependentRows = [];
     }
     
     
     
     /**
-     * Add $dependentRow to the internal list of children.
+     * Add $dependentRow to the internal list of children. Also called by ChildFeature to add the child to the parent's
+     * list.
      *
      * @param RowInterface $dependentRow
      * @param string       $constraintName
@@ -162,7 +173,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     {
         $dependentTable = $this->resolveDependentTable($dependentRow);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $constraintName);
-        $constraintName=$dependentTableConstraint['NAME'];
+        $constraintName = $dependentTableConstraint['NAME'];
         
         $uniqueid = implode('-', $dependentRow->primaryKeyData ?? []);
         if (empty($uniqueid)) {
@@ -174,6 +185,24 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         $this->dependentRows[$constraintName][$uniqueid]['uniqueid'] = $uniqueid;
         $this->dependentRows[$constraintName][$uniqueid]['action'] = $action;
         $this->dependentRows[$constraintName][$uniqueid]['dependentRow'] = $dependentRow;
+    }
+    
+    
+    
+    /**
+     * Get all cached dependent rows for a given constraint name.
+     *
+     * @param string $constraintName
+     *
+     * @return array
+     */
+    private function dependentRowListGetDependentRows(string $constraintName): array
+    {
+        $a = [];
+        foreach (($this->dependentRows[$constraintName] ?? []) as $uniqueid => $depententRowInfo) {
+            $a[] = $depententRowInfo['dependentRow'];
+        }
+        return $a;
     }
     
     
@@ -284,6 +313,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     }
     
     
+    
     /**
      * If dependent row implements ChildFeature, store a reference to this parent row in child.
      *
@@ -292,9 +322,9 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      *
      * @return void
      */
-    private function addParentToChild(RowInterface $dependentRow, string $constraintName, string $action='save')
+    private function addParentToChild(RowInterface $dependentRow, string $constraintName, string $action = 'save')
     {
-        if($dependentRow instanceof ChildFeatureAttributesInterface) {
+        if ($dependentRow instanceof ChildFeatureAttributesInterface) {
             $dependentRow->parentRowListAdd($this->rowGateway, $constraintName, $action);
         }
     }
@@ -336,7 +366,16 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             function (Where $where) use ($dependentTableConstraint, $row) {
                 $n = $where->NEST;
                 foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
-                    $n->and->equalTo("{$dependentTableConstraint['TABLE']}.{$column}", $row->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]));
+                    try {
+                        $rightVal = $row->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]);
+                    } catch (NoDefaultValueException $e) {
+                        $rightVal = 'parentRow_IS_NEW';
+                        $n->and->equalTo(1, 0, ExpressionInterface::TYPE_VALUE);
+                    }
+                    $n->and->equalTo(
+                        "{$dependentTableConstraint['TABLE']}.{$column}",
+                        $rightVal
+                    );
                 }
             }
         );
@@ -346,16 +385,22 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             $select->where->addPredicate($existingWhere);
         }
         
-        \Ruga\Log::addLog("SQL={$select->getSqlString($dependentTable->getAdapter()->getPlatform())}");
+        \Ruga\Log::addLog(
+            "SQL={$select->getSqlString($dependentTable->getAdapter()->getPlatform())}",
+            \Ruga\Log\Severity::DEBUG
+        );
         /** @var ResultSetInterface $rowset */
         $rowset = $dependentTable->selectWith($select);
-        
-        $a = [];
+
+//        $a = [];
         foreach ($rowset as $row) {
-            $a[] = $row;
+//            $a[] = $row;
             $this->dependentRowListAdd($row, $dependentTableConstraint['NAME']);
             $this->addParentToChild($row, $dependentTableConstraint['NAME']);
         }
+        
+        
+        $a = $this->dependentRowListGetDependentRows($dependentTableConstraint['NAME']);
         
         // Must re-initialize ResultSet to keep reference to the rows
         $rowset->initialize($a);

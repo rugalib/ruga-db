@@ -51,11 +51,15 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         foreach ($this->parentRows as $constraintName => $parentRows) {
             foreach ($parentRows as $uniqueid => $parentRowInfo) {
                 /** @var RowInterface $parentRow */
-                $parentRow = $parentRowInfo['dependentRow'];
+                $parentRow = $parentRowInfo['parentRow'];
                 
                 if ($parentRowInfo['action'] == 'save') {
                     if ($parentRow->isNew()) {
                         $aNewParentRows[] = $parentRow;
+                        
+                        throw new InvalidForeignKeyException(
+                            'Parent row must be saved to database first (' . get_class($parentRow) . ').'
+                        );
                     } else {
                         // Update foreign key
                         $parentTable = $this->resolveTableArgument($parentRow);
@@ -98,14 +102,29 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     
     public function postSave()
     {
+        // Clear parent's cache list after saving
+        // this is necessary, because parent is not saved by child save operation
+        foreach ($this->parentRows as $parentConstraintName => $parentConstraintRows) {
+            foreach ($parentConstraintRows as $uniqueid => $parentRowInfo) {
+                $parentRowInfo['parentRow']->dependentRowListClear();
+            }
+        }
         // Successfully saved => delete dependent row list
         $this->parentRows = [];
     }
     
     
     
+    public function parentRowListClear()
+    {
+        $this->parentRows = [];
+    }
+    
+    
+    
     /**
-     * Add $parentRow to the internal list of parents.
+     * Add $parentRow to the internal list of parents. Also called by ParentFeature to add the parent to the child's
+     * list.
      *
      * @param RowInterface $parentRow
      * @param string       $constraintName
@@ -124,7 +143,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         
         $this->parentRows[$constraintName][$uniqueid]['uniqueid'] = $uniqueid;
         $this->parentRows[$constraintName][$uniqueid]['action'] = $action;
-        $this->parentRows[$constraintName][$uniqueid]['dependentRow'] = $parentRow;
+        $this->parentRows[$constraintName][$uniqueid]['parentRow'] = $parentRow;
     }
     
     
@@ -284,7 +303,10 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
             function (Where $where) use ($parentTableConstraint, $row) {
                 $n = $where->NEST;
                 foreach ($parentTableConstraint['REF_COLUMNS'] as $colPos => $column) {
-                    $n->and->equalTo("{$parentTableConstraint['REF_TABLE']}.{$column}", $row->offsetGet($parentTableConstraint['COLUMNS'][$colPos]));
+                    $n->and->equalTo(
+                        "{$parentTableConstraint['REF_TABLE']}.{$column}",
+                        $row->offsetGet($parentTableConstraint['COLUMNS'][$colPos])
+                    );
                 }
             }
         );

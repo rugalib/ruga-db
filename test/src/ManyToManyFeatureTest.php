@@ -220,16 +220,24 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $nRow->linkManyToManyRow($mRow, PartyHasOrganizationTable::class);
         
         $iRows = $nRow->findIntersectionRows($mRow, PartyHasOrganizationTable::class);
-        
         /** @var PartyHasOrganization $iRow */
         foreach ($iRows as $iRow) {
             echo "\$iRow->Party_id={$iRow->Party_id}";
             echo $iRow->isNew() ? " (NEW)" : "";
             echo PHP_EOL;
         }
-        
         $this->assertCount(1, $iRows);
-        //$nRow->save();
+        
+        
+        $nRow->save();
+        $iRows = $nRow->findIntersectionRows($mRow, PartyHasOrganizationTable::class);
+        /** @var PartyHasOrganization $iRow */
+        foreach ($iRows as $iRow) {
+            echo "\$iRow->Party_id={$iRow->Party_id}";
+            echo $iRow->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        $this->assertCount(1, $iRows);
     }
     
     
@@ -247,7 +255,6 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $nRow->linkManyToManyRow($mRow, PartyHasOrganizationTable::class, ['organization_role' => 'PARTNER']);
         
         $iRows = $nRow->findIntersectionRows($mRow, PartyHasOrganizationTable::class);
-        
         /** @var PartyHasOrganization $iRow */
         foreach ($iRows as $iRow) {
             echo "\$iRow->organization_role=" . implode(',', $iRow->organization_role);
@@ -256,7 +263,18 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         }
         
         $this->assertCount(1, $iRows);
-//        $nRow->save();
+        
+        
+        $nRow->save();
+        $iRows = $nRow->findIntersectionRows($mRow, PartyHasOrganizationTable::class);
+        /** @var PartyHasOrganization $iRow */
+        foreach ($iRows as $iRow) {
+            echo "\$iRow->organization_role=" . implode(',', $iRow->organization_role);
+            echo $iRow->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        
+        $this->assertCount(1, $iRows);
     }
     
     
