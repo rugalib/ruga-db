@@ -39,6 +39,7 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
     public function testCanFindManyToManyRowAndEditAndSaveThruNRow()
     {
         $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
@@ -48,7 +49,7 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         
         /** @var Organization $mRow */
         $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
-        $mRow->name='This row has been changed';
+        $mRow->name = 'This row has been changed';
         $nRow->save();
         
         $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
@@ -113,6 +114,7 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
     public function testCanNotUnlinkManyToManyRow()
     {
         $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
@@ -128,6 +130,7 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->expectException(InvalidQueryException::class);
         $nRow->save();
     }
+    
     
     
     public function testCanDeleteManyToManyRow()
@@ -147,5 +150,114 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $mRowset = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class);
         $this->assertCount(0, $mRowset);
     }
+    
+    
+    
+    public function testCanFindMRowBeforeSaving()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(1)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        $mTable = new \Ruga\Db\Test\Model\OrganizationTable($this->getAdapter());
+        $mRow = $mTable->createRow(['name' => 'Kaufmann']);
+        
+        $nRow->linkManyToManyRow($mRow, PartyHasOrganizationTable::class);
+        
+        $mRows = $nRow->findManyToManyRowset($mTable, PartyHasOrganizationTable::class);
+        
+        /** @var Organization $mRow */
+        foreach ($mRows as $mRow) {
+            echo "{$mRow->idname} {$mRow->name}";
+            echo $mRow->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        
+        $this->assertCount(1, $mRows);
+        //$nRow->save();
+    }
+    
+    
+    
+    public function testCanFindMRowWhenNothingSaved()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->createRow(['fullname' => 'This is a new Party']);
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        $mTable = new \Ruga\Db\Test\Model\OrganizationTable($this->getAdapter());
+        $mRow = $mTable->createRow(['name' => 'This is a new Organization']);
+        
+        $nRow->linkManyToManyRow($mRow, PartyHasOrganizationTable::class);
+        
+        $mRows = $nRow->findManyToManyRowset($mTable, PartyHasOrganizationTable::class);
+        
+        /** @var Organization $mRow */
+        foreach ($mRows as $mRow) {
+            echo "{$mRow->idname} {$mRow->name}";
+            echo $mRow->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        
+        $this->assertCount(1, $mRows);
+        //$nRow->save();
+    }
+    
+    
+    
+    public function testCanFindIRowBeforeSaving()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(1)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        $mTable = new \Ruga\Db\Test\Model\OrganizationTable($this->getAdapter());
+        $mRow = $mTable->createRow(['name' => 'Kaufmann']);
+        
+        $nRow->linkManyToManyRow($mRow, PartyHasOrganizationTable::class);
+        
+        $iRows = $nRow->findIntersectionRows($mRow, PartyHasOrganizationTable::class);
+        
+        /** @var PartyHasOrganization $iRow */
+        foreach ($iRows as $iRow) {
+            echo "\$iRow->Party_id={$iRow->Party_id}";
+            echo $iRow->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        
+        $this->assertCount(1, $iRows);
+        //$nRow->save();
+    }
+    
+    
+    
+    public function testCanFindIRowWhenNothingSaved()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->createRow(['fullname' => 'This is a new Party']);
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        $mTable = new \Ruga\Db\Test\Model\OrganizationTable($this->getAdapter());
+        $mRow = $mTable->createRow(['name' => 'This is a new Organization']);
+        
+        $nRow->linkManyToManyRow($mRow, PartyHasOrganizationTable::class, ['organization_role' => 'PARTNER']);
+        
+        $iRows = $nRow->findIntersectionRows($mRow, PartyHasOrganizationTable::class);
+        
+        /** @var PartyHasOrganization $iRow */
+        foreach ($iRows as $iRow) {
+            echo "\$iRow->organization_role=" . implode(',', $iRow->organization_role);
+            echo $iRow->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        
+        $this->assertCount(1, $iRows);
+//        $nRow->save();
+    }
+    
     
 }

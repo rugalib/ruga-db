@@ -12,6 +12,8 @@ use Laminas\Db\Adapter\Driver\ResultInterface;
 use Laminas\Db\ResultSet\ResultSetInterface;
 use Laminas\Db\RowGateway\RowGateway;
 use Laminas\Db\Sql\Expression;
+use Laminas\Db\Sql\ExpressionInterface;
+use Laminas\Db\Sql\Predicate\Predicate;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
 use Ruga\Db\Adapter\Adapter;
@@ -19,6 +21,7 @@ use Ruga\Db\ResultSet\ResultSet;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
+use Ruga\Db\Row\Exception\NoDefaultValueException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
 use Ruga\Db\Table\Feature\MetadataFeature;
@@ -257,6 +260,43 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     
     
     
+    private function manyToManyRowListGetMRows($iTable, string $mConstraintName, string $nConstraintName, string $action = 'save'): array
+    {
+        $nTable = $this->rowGateway->getTableGateway();
+        $iTable = $this->resolveTableArgument($iTable);
+        $iTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nConstraintName);
+        $nConstraintName = $iTableConstraint['NAME'];
+        
+        $a=[];
+        foreach(($this->manyToManyRows[$nConstraintName] ?? []) as $iUniqueid => $iInfo) {
+            foreach(($iInfo['m'][$mConstraintName] ?? []) as $mUniqueid => $mInfo ) {
+                $a[]=$mInfo['mRow'];
+            }
+        }
+        
+        return $a;
+    }
+    
+    private function manyToManyRowListGetIRows(RowInterface $mRow, $iTable, string $nConstraintName, string $mConstraintName): array
+    {
+        $nTable = $this->rowGateway->getTableGateway();
+        $iTable = $this->resolveTableArgument($iTable);
+        $iTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nConstraintName);
+        $nConstraintName = $iTableConstraint['NAME'];
+        
+        $a=[];
+        foreach(($this->manyToManyRows[$nConstraintName] ?? []) as $iUniqueid => $iInfo) {
+            foreach(($iInfo['m'][$mConstraintName] ?? []) as $mUniqueid => $mInfo ) {
+                if($mInfo['mRow'] == $mRow) {
+                    $a[]=$iInfo['iRow'];
+                }
+            }
+        }
+        
+        return $a;
+    }
+    
+    
     /**
      * Resolves the given $table to a TableInterface object.
      *
@@ -439,9 +479,15 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             function (Where $where) use ($nTableConstraint, $row) {
                 $n = $where->NEST;
                 foreach ($nTableConstraint['COLUMNS'] as $colPos => $column) {
+                    try {
+                        $rightVal = $row->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos]);
+                    } catch (NoDefaultValueException $e) {
+                        $rightVal='nRow_IS_NEW';
+                        $n->and->equalTo(1, 0, ExpressionInterface::TYPE_VALUE);
+                    }
                     $n->and->equalTo(
                         "{$nTableConstraint['TABLE']}.{$column}",
-                        $row->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos])
+                        $rightVal
                     );
                 }
             }
@@ -452,19 +498,21 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             $select->where->addPredicate($existingWhere);
         }
         
-        \Ruga\Log::addLog("SQL={$select->getSqlString($mTable->getAdapter()->getPlatform())}");
+        \Ruga\Log::addLog("SQL={$select->getSqlString($mTable->getAdapter()->getPlatform())}", \Ruga\Log\Severity::DEBUG);
         $mRowset = $mTable->selectWith($select);
         
-        $a = [];
+        
+        // Save found rows in manyToManyRows cache
         /** @var RowInterface $mRow */
         foreach ($mRowset as $mRow) {
-            $a[] = $mRow;
             $iRowset = $this->findIntersectionRows($mRow, $iTable, $nRuleKey, $mRuleKey);
             /** @var RowInterface $iRow */
             foreach ($iRowset as $iRow) {
                 $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
             }
         }
+        
+        $a=$this->manyToManyRowListGetMRows($iTable, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
         
         // Must re-initialize ResultSet to keep reference to the rows
         $mRowset->initialize($a);
@@ -519,15 +567,28 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             function (Where $where) use ($nTableConstraint, $mTableConstraint, $nRow, $mRow) {
                 $n = $where->NEST;
                 foreach ($nTableConstraint['COLUMNS'] as $colPos => $column) {
+                    try {
+                        $rightVal=$nRow->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos]);
+                    } catch (NoDefaultValueException $e) {
+                        $rightVal='nRow_IS_NEW';
+                        $n->and->equalTo(1, 0, ExpressionInterface::TYPE_VALUE);
+                    }
+                    
                     $n->and->equalTo(
                         "{$nTableConstraint['TABLE']}.{$column}",
-                        $nRow->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos])
+                        $rightVal
                     );
                 }
                 foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
+                    try {
+                        $rightVal=$mRow->offsetGet($mTableConstraint['REF_COLUMNS'][$colPos]);
+                    } catch (NoDefaultValueException $e) {
+                        $rightVal='mRow_IS_NEW';
+                        $n->and->equalTo(1, 0, ExpressionInterface::TYPE_VALUE);
+                    }
                     $n->and->equalTo(
                         "{$mTableConstraint['TABLE']}.{$column}",
-                        $mRow->offsetGet($mTableConstraint['REF_COLUMNS'][$colPos])
+                        $rightVal
                     );
                 }
             }
@@ -538,8 +599,20 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             $select->where->addPredicate($existingWhere);
         }
         
-        \Ruga\Log::addLog("SQL={$select->getSqlString($iTable->getAdapter()->getPlatform())}");
+        \Ruga\Log::addLog("SQL={$select->getSqlString($iTable->getAdapter()->getPlatform())}", \Ruga\Log\Severity::DEBUG);
         $iRowset = $iTable->selectWith($select);
+        
+        
+        // Update manyToManyRows cache
+        /** @var RowInterface $iRow */
+        foreach($iRowset as $iRow) {
+            $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
+        }
+        
+        $a=$this->manyToManyRowListGetIRows($mRow,$iTable,$nTableConstraint['NAME'],$mTableConstraint['NAME']);
+        
+        // Must re-initialize ResultSet to keep reference to the rows
+        $iRowset->initialize($a);
         
         return $iRowset;
     }
@@ -617,23 +690,27 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         
         $iRow = $iTable->createRow($iRowData);
         
-        if (!$this->rowGateway->isNew()) {
-            // If parent row is already saved, set foreign key values in dependent row
-            foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
+        // If n row is already saved, set foreign key values in dependent row
+        foreach ($nTableConstraint['COLUMNS'] as $colPos => $column) {
+            try {
                 $iRow->offsetSet(
                     $column,
-                    $this->rowGateway->offsetGet($mTableConstraint['REF_COLUMNS'][$colPos])
+                    $this->rowGateway->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos])
                 );
+            } catch (NoDefaultValueException $e) {
+                \Ruga\Log::addLog("nRow is NEW", \Ruga\Log\Severity::DEBUG);
             }
         }
         
-        if (!$mRow->isNew()) {
-            // If parent row is already saved, set foreign key values in dependent row
-            foreach ($nTableConstraint['COLUMNS'] as $colPos => $column) {
+        // If parent row is already saved, set foreign key values in dependent row
+        foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
+            try {
                 $iRow->offsetSet(
                     $column,
-                    $mRow->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos])
+                    $mRow->offsetGet($mTableConstraint['REF_COLUMNS'][$colPos])
                 );
+            } catch (NoDefaultValueException $e) {
+                \Ruga\Log::addLog("mRow is NEW", \Ruga\Log\Severity::DEBUG);
             }
         }
         
