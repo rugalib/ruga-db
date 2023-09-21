@@ -16,6 +16,7 @@ use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
+use Ruga\Db\Test\Model\Cart;
 use Ruga\Db\Test\Model\CartItem;
 use Ruga\Db\Test\Model\CartItemTable;
 use Ruga\Db\Test\Model\CartTable;
@@ -538,6 +539,82 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
             echo PHP_EOL;
         }
         $this->assertCount(1, $items);
+    }
+    
+    
+    
+    public function testCanFindParentUnsaved()
+    {
+        $parentTable = new \Ruga\Db\Test\Model\CartTable($this->getAdapter());
+        /** @var Cart $parentRow */
+        $parentRow = $parentTable->findById(2)->current(2);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\CartItemTable($this->getAdapter());
+        /** @var CartItem $dependentRow */
+        $dependentRow = $dependentTable->createRow(['fullname' => 'cart 2, item 7', 'seq' => 7]);
+        
+        $dependentRow->linkParentRow($parentRow);
+//        $dependentRow->save();
+        
+        $items = $parentRow->findDependentRowset(CartItemTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo $item->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        $this->assertCount(7, $items);
+        echo PHP_EOL;
+        
+        
+        $dependentRow->save();
+        $items = $parentRow->findDependentRowset(CartItemTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo $item->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        $this->assertCount(7, $items);
+    }
+    
+    
+    
+    public function testCanFindParentEverythingUnsaved()
+    {
+        $parentTable = new \Ruga\Db\Test\Model\CartTable($this->getAdapter());
+        /** @var Cart $parentRow */
+        $parentRow = $parentTable->createRow(['fullname' => 'This is a new cart']);
+//        $parentRow->save();
+        
+        $dependentTable = new \Ruga\Db\Test\Model\CartItemTable($this->getAdapter());
+        for ($i = 1; $i < 5; $i++) {
+            /** @var CartItem $dependentRow */
+            $dependentRow = $dependentTable->createRow(['fullname' => "new cart 3, item {$i}", 'seq' => $i]);
+            $dependentRow->linkParentRow($parentRow);
+//            $dependentRow->save();
+        }
+        
+        $items = $parentRow->findDependentRowset(CartItemTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo $item->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        $this->assertCount(4, $items);
+        echo PHP_EOL;
+        
+        
+        $parentRow->save();
+        $items = $parentRow->findDependentRowset(CartItemTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo $item->isNew() ? " (NEW)" : "";
+            echo PHP_EOL;
+        }
+        $this->assertCount(4, $items);
     }
     
 }
