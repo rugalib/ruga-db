@@ -8,10 +8,12 @@ declare(strict_types=1);
 
 namespace Ruga\Db\Row\Feature;
 
+use Exception;
 use Laminas\Db\ResultSet\ResultSetInterface;
 use Laminas\Db\Sql\ExpressionInterface;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
+use ReflectionException;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
@@ -39,7 +41,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
                 MetadataFeature::class
             );
             if (!$this->metadataFeature || !($this->metadataFeature instanceof MetadataFeature)) {
-                throw new \Exception(
+                throw new Exception(
                     get_class($this) . " requires " . MetadataFeature::class . " in " . get_class(
                         $this->getTableGateway()
                     )
@@ -118,7 +120,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      * Before this (parent) row is updated, save all dependent (child) rows.
      *
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function preUpdate()
     {
@@ -132,7 +134,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      * After this (parent) row is inserted, save all dependent (child) rows.
      *
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function postInsert()
     {
@@ -167,7 +169,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      * @param string|null       $action
      *
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function dependentRowListAdd(?RowInterface $dependentRow, string $constraintName, ?string $action = null)
     {
@@ -180,7 +182,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         $constraintName = $dependentTableConstraint['NAME'];
         
         $uniqueid = implode('-', $dependentRow->primaryKeyData ?? []);
-        $uniqueid = empty($uniqueid) ? '?'.spl_object_hash($dependentRow) : $uniqueid;
+        $uniqueid = empty($uniqueid) ? '?' . spl_object_hash($dependentRow) : $uniqueid;
         $uniqueid .= '@' . get_class($dependentRow);
         
         if (!array_key_exists($uniqueid, $this->dependentRows[$constraintName] ?? [])) {
@@ -220,10 +222,11 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     /**
      * Resolves the given $dependentTable to a TableInterface object.
      *
-     * @param mixed $dependentTable Table name, Table class name, Table object or Row object.
+     * @param string|RowInterface|TableInterface $dependentTable Table name, Table class name, Table object or Row
+     *                                                           object.
      *
      * @return TableInterface
-     * @throws \Exception
+     * @throws Exception
      */
     private function resolveDependentTable($dependentTable): TableInterface
     {
@@ -329,6 +332,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      *
      * @param RowInterface $dependentRow
      * @param string       $constraintName
+     * @param string|null  $action
      *
      * @return void
      */
@@ -344,12 +348,13 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     /**
      * Find dependent rows (children) in table $dependentTable.
      *
-     * @param mixed       $dependentTable Table name, Table class name, Table object or Row object.
-     * @param string|null $ruleKey        Name of constraint or reference map entry to use.
-     * @param Select|null $select         Additional select statements.
+     * @param string|RowInterface|TableInterface $dependentTable Table name, Table class name, Table object or Row
+     *                                                           object.
+     * @param string|null                        $ruleKey        Name of constraint or reference map entry to use.
+     * @param Select|null                        $select         Additional select statements.
      *
      * @return ResultSetInterface
-     * @throws \Exception
+     * @throws Exception
      */
     public function findDependentRowset(
         $dependentTable,
@@ -422,12 +427,14 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     /**
      * Create a new dependent row.
      *
-     * @param mixed       $dependentTable Table name, Table class name, Table object or Row object.
-     * @param array       $rowData
-     * @param string|null $ruleKey        Name of constraint or reference map entry to use.
+     * @param string|RowInterface|TableInterface $dependentTable Table name, Table class name, Table object or Row
+     *                                                           object.
+     * @param array                              $rowData
+     * @param string|null                        $ruleKey        Name of constraint or reference map entry to use.
      *
      * @return RowInterface
-     * @throws \ReflectionException
+     * @throws ReflectionException
+     * @throws Exception
      */
     
     public function createDependentRow($dependentTable, array $rowData = [], ?string $ruleKey = null): RowInterface
@@ -435,11 +442,13 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         $dependentTable = $this->resolveDependentTable($dependentTable);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
         
-        if (!$this->rowGateway->isNew()) {
+        try {
             // If parent row is already saved, set foreign key values in dependent row
             foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
                 $rowData[$column] = $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos]);
             }
+        } catch (NoDefaultValueException $e) {
+            \Ruga\Log::addLog("parentRow is NEW", \Ruga\Log\Severity::DEBUG);
         }
         
         $dependentRow = $dependentTable->createRow($rowData);
@@ -454,13 +463,13 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     
     
     /**
-     * Delete a dependent row. The delete is done, when the parent row is saved.
+     * Delete a dependent row. The deletion is done, when the parent row is saved.
      *
      * @param RowInterface $dependentRow
      * @param string|null  $ruleKey
      *
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function deleteDependentRow(RowInterface $dependentRow, ?string $ruleKey = null)
     {
@@ -483,14 +492,14 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      * @param string|null  $ruleKey
      *
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function linkDependentRow(RowInterface $dependentRow, ?string $ruleKey = null): RowInterface
     {
         $dependentTable = $this->resolveDependentTable($dependentRow);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
         
-        if (!$this->rowGateway->isNew()) {
+        try {
             // If parent row is already saved, set foreign key values in dependent row
             foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
                 $dependentRow->offsetSet(
@@ -498,6 +507,8 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
                     $this->rowGateway->offsetGet($dependentTableConstraint['REF_COLUMNS'][$colPos])
                 );
             }
+        } catch (NoDefaultValueException $e) {
+            \Ruga\Log::addLog("parentRow is NEW", \Ruga\Log\Severity::DEBUG);
         }
         
         // Add dependent row to list for later saving
@@ -516,14 +527,14 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      * @param string|null  $ruleKey
      *
      * @return RowInterface
-     * @throws \Exception
+     * @throws Exception
      */
     public function unlinkDependentRow(RowInterface $dependentRow, ?string $ruleKey = null): RowInterface
     {
         $dependentTable = $this->resolveDependentTable($dependentRow);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
         
-        foreach ($dependentTableConstraint['COLUMNS'] as $colPos => $column) {
+        foreach ($dependentTableConstraint['COLUMNS'] as $column) {
             $dependentRow->offsetSet($column, null);
         }
         

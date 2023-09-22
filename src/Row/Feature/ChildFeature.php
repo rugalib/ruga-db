@@ -115,6 +115,11 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     
     
     
+    /**
+     * Clear the parent row cache.
+     *
+     * @return void
+     */
     public function parentRowListClear()
     {
         $this->parentRows = [];
@@ -139,7 +144,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         }
         
         $uniqueid = implode('-', $parentRow->primaryKeyData ?? []);
-        $uniqueid = empty($uniqueid) ? '?'.spl_object_hash($parentRow) : $uniqueid;
+        $uniqueid = empty($uniqueid) ? '?' . spl_object_hash($parentRow) : $uniqueid;
         $uniqueid .= '@' . get_class($parentRow);
         
         // Only add row if it does not already exist in cache
@@ -179,7 +184,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     /**
      * Resolves the given $table to a TableInterface object.
      *
-     * @param mixed $table Table name, Table class name, Table object or Row object.
+     * @param string|RowInterface|TableInterface $table Table name, Table class name, Table object or Row object.
      *
      * @return TableInterface
      * @throws \Exception
@@ -287,6 +292,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      *
      * @param RowInterface $parentRow
      * @param string       $constraintName
+     * @param string|null  $action
      *
      * @return void
      */
@@ -302,9 +308,9 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     /**
      * Find the parent row.
      *
-     * @param             $parentTable
-     * @param string|null $ruleKey
-     * @param Select|null $select
+     * @param string|RowInterface|TableInterface $parentTable
+     * @param string|null                        $ruleKey
+     * @param Select|null                        $select
      *
      * @return RowInterface|null
      * @throws \Exception
@@ -361,9 +367,9 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     /**
      * Create a new parent row.
      *
-     * @param             $parentTable
-     * @param array       $rowData
-     * @param string|null $ruleKey
+     * @param string|RowInterface|TableInterface $parentTable
+     * @param array                              $rowData
+     * @param string|null                        $ruleKey
      *
      * @return RowInterface
      * @throws \ReflectionException
@@ -388,8 +394,8 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     /**
      * Delete the parent row. The delete is done, when the dependent row is saved.
      *
-     * @param             $parentTable
-     * @param string|null $ruleKey
+     * @param string|RowInterface|TableInterface $parentTable
+     * @param string|null                        $ruleKey
      *
      * @return void
      * @throws \Exception
@@ -443,8 +449,8 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     /**
      * Remove relation between this row and the given parent.
      *
-     * @param mixed       $parentTable
-     * @param string|null $ruleKey
+     * @param string|RowInterface|TableInterface $parentTable
+     * @param string|null                        $ruleKey
      *
      * @return RowInterface The former parent row
      * @throws \Exception

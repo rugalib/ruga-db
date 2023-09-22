@@ -153,6 +153,26 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     
     
+    public function testCanDeleteManyToManyRowUnsaved()
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(4)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        /** @var Organization $mRow */
+        $mRow = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class)->current();
+        $this->assertInstanceOf(Organization::class, $mRow);
+        
+        $nRow->deleteManyToManyRow($mRow, PartyHasOrganizationTable::class);
+//        $nRow->save();
+        
+        $mRowset = $nRow->findManyToManyRowset(OrganizationTable::class, PartyHasOrganizationTable::class);
+        $this->assertCount(0, $mRowset);
+    }
+    
+    
+    
     public function testCanFindMRowBeforeSaving()
     {
         $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());

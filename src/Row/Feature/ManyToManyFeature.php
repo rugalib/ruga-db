@@ -210,7 +210,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      * @param RowInterface $iRow
      * @param string       $mConstraintName
      * @param string       $nConstraintName
-     * @param string       $action
+     * @param string|null  $action
      *
      * @return void
      * @throws \Exception
@@ -220,7 +220,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         RowInterface $iRow,
         string $mConstraintName,
         string $nConstraintName,
-        string $action = 'save'
+        ?string $action = null
     ) {
         $nTable = $this->rowGateway->getTableGateway();
         $iTable = $this->resolveTableArgument($iRow);
@@ -228,60 +228,67 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $nConstraintName = $iTableConstraint['NAME'];
         
         $iUniqueid = implode('-', $iRow->primaryKeyData ?? []);
-        $iUniqueid = empty($iUniqueid) ? '?'.spl_object_hash($iRow) : $iUniqueid;
+        $iUniqueid = empty($iUniqueid) ? '?' . spl_object_hash($iRow) : $iUniqueid;
         $iUniqueid .= '@' . get_class($iRow);
         
-        $this->manyToManyRows[$nConstraintName][$iUniqueid]['uniqueid'] = $iUniqueid;
-        $this->manyToManyRows[$nConstraintName][$iUniqueid]['action'] = $action;
-        $this->manyToManyRows[$nConstraintName][$iUniqueid]['iRow'] = $iRow;
-        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'] = [];
+        if (!array_key_exists($iUniqueid, $this->manyToManyRows[$nConstraintName] ?? [])) {
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['uniqueid'] = $iUniqueid;
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['action'] = $action ?? 'save';
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['iRow'] = $iRow;
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'] = [];
+        }
+        if ($action) {
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['action'] = $action;
+        }
         
         
         $mTable = $this->resolveTableArgument($mRow);
         $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mConstraintName);
         $mConstraintName = $mTableConstraint['NAME'];
         
-
+        
         $mUniqueid = implode('-', $mRow->primaryKeyData ?? []);
-        $mUniqueid = empty($mUniqueid) ? '?'.spl_object_hash($mRow) : $mUniqueid;
+        $mUniqueid = empty($mUniqueid) ? '?' . spl_object_hash($mRow) : $mUniqueid;
         $mUniqueid .= '@' . get_class($mRow);
         
-        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['uniqueid'] = $mUniqueid;
-        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['action'] = $action;
-        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['mRow'] = $mRow;
-    }
-    
-    
-    
-    private function manyToManyRowListGetMRows($iTable, string $mConstraintName, string $nConstraintName, string $action = 'save'): array
-    {
-        $nTable = $this->rowGateway->getTableGateway();
-        $iTable = $this->resolveTableArgument($iTable);
-        $iTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nConstraintName);
-        $nConstraintName = $iTableConstraint['NAME'];
-        
-        $a=[];
-        foreach(($this->manyToManyRows[$nConstraintName] ?? []) as $iUniqueid => $iInfo) {
-            foreach(($iInfo['m'][$mConstraintName] ?? []) as $mUniqueid => $mInfo ) {
-                $a[]=$mInfo['mRow'];
-            }
+        if (!array_key_exists(
+            $mUniqueid,
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName] ?? []
+        )) {
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['uniqueid'] = $mUniqueid;
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['action'] = $action ?? 'save';
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['mRow'] = $mRow;
         }
         
-        return $a;
+        if ($action) {
+            $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['action'] = $action;
+        }
     }
     
-    private function manyToManyRowListGetIRows(RowInterface $mRow, $iTable, string $nConstraintName, string $mConstraintName): array
+    
+    
+    /**
+     * Return the match rows for a relation using the given intersection table.
+     *
+     * @param        $iTable    string|RowInterface|TableInterface intersection table
+     * @param string $mConstraintName
+     * @param string $nConstraintName
+     *
+     * @return array
+     * @throws \Exception
+     */
+    private function manyToManyRowListGetMRows($iTable, string $mConstraintName, string $nConstraintName): array
     {
         $nTable = $this->rowGateway->getTableGateway();
         $iTable = $this->resolveTableArgument($iTable);
         $iTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nConstraintName);
         $nConstraintName = $iTableConstraint['NAME'];
         
-        $a=[];
-        foreach(($this->manyToManyRows[$nConstraintName] ?? []) as $iUniqueid => $iInfo) {
-            foreach(($iInfo['m'][$mConstraintName] ?? []) as $mUniqueid => $mInfo ) {
-                if($mInfo['mRow'] == $mRow) {
-                    $a[]=$iInfo['iRow'];
+        $a = [];
+        foreach (($this->manyToManyRows[$nConstraintName] ?? []) as $iUniqueid => $iInfo) {
+            foreach (($iInfo['m'][$mConstraintName] ?? []) as $mUniqueid => $mInfo) {
+                if (($mInfo['action'] ?? '') == 'save') {
+                    $a[] = $mInfo['mRow'];
                 }
             }
         }
@@ -290,10 +297,52 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     }
     
     
+    
+    /**
+     * Return the intersection rows for a relation from this row to the given match row.
+     *
+     * @param RowInterface $mRow
+     * @param              $iTable
+     * @param string       $nConstraintName
+     * @param string       $mConstraintName
+     *
+     * @return array
+     * @throws \Exception
+     */
+    private function manyToManyRowListGetIRows(
+        RowInterface $mRow,
+        $iTable,
+        string $nConstraintName,
+        string $mConstraintName
+    ): array {
+        $nTable = $this->rowGateway->getTableGateway();
+        $iTable = $this->resolveTableArgument($iTable);
+        $iTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nConstraintName);
+        $nConstraintName = $iTableConstraint['NAME'];
+        
+        $mRowUniqueid = implode('-', $mRow->primaryKeyData ?? []);
+        $mRowUniqueid = empty($mRowUniqueid) ? '?' . spl_object_hash($mRow) : $mRowUniqueid;
+        $mRowUniqueid .= '@' . get_class($mRow);
+        
+        
+        $a = [];
+        foreach (($this->manyToManyRows[$nConstraintName] ?? []) as $iUniqueid => $iInfo) {
+            foreach (($iInfo['m'][$mConstraintName] ?? []) as $mUniqueid => $mInfo) {
+                if ($mUniqueid == $mRowUniqueid) {
+                    $a[] = $iInfo['iRow'];
+                }
+            }
+        }
+        
+        return $a;
+    }
+    
+    
+    
     /**
      * Resolves the given $table to a TableInterface object.
      *
-     * @param mixed $table Table name, Table class name, Table object or Row object.
+     * @param string|RowInterface|TableInterface $table Table name, Table class name, Table object or Row object.
      *
      * @return TableInterface
      * @throws \Exception
@@ -475,7 +524,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
                     try {
                         $rightVal = $row->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos]);
                     } catch (NoDefaultValueException $e) {
-                        $rightVal='nRow_IS_NEW';
+                        $rightVal = 'nRow_IS_NEW';
                         $n->and->equalTo(1, 0, ExpressionInterface::TYPE_VALUE);
                     }
                     $n->and->equalTo(
@@ -491,7 +540,10 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             $select->where->addPredicate($existingWhere);
         }
         
-        \Ruga\Log::addLog("SQL={$select->getSqlString($mTable->getAdapter()->getPlatform())}", \Ruga\Log\Severity::DEBUG);
+        \Ruga\Log::addLog(
+            "SQL={$select->getSqlString($mTable->getAdapter()->getPlatform())}",
+            \Ruga\Log\Severity::DEBUG
+        );
         $mRowset = $mTable->selectWith($select);
         
         
@@ -505,7 +557,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             }
         }
         
-        $a=$this->manyToManyRowListGetMRows($iTable, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
+        $a = $this->manyToManyRowListGetMRows($iTable, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
         
         // Must re-initialize ResultSet to keep reference to the rows
         $mRowset->initialize($a);
@@ -561,9 +613,9 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
                 $n = $where->NEST;
                 foreach ($nTableConstraint['COLUMNS'] as $colPos => $column) {
                     try {
-                        $rightVal=$nRow->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos]);
+                        $rightVal = $nRow->offsetGet($nTableConstraint['REF_COLUMNS'][$colPos]);
                     } catch (NoDefaultValueException $e) {
-                        $rightVal='nRow_IS_NEW';
+                        $rightVal = 'nRow_IS_NEW';
                         $n->and->equalTo(1, 0, ExpressionInterface::TYPE_VALUE);
                     }
                     
@@ -574,9 +626,9 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
                 }
                 foreach ($mTableConstraint['COLUMNS'] as $colPos => $column) {
                     try {
-                        $rightVal=$mRow->offsetGet($mTableConstraint['REF_COLUMNS'][$colPos]);
+                        $rightVal = $mRow->offsetGet($mTableConstraint['REF_COLUMNS'][$colPos]);
                     } catch (NoDefaultValueException $e) {
-                        $rightVal='mRow_IS_NEW';
+                        $rightVal = 'mRow_IS_NEW';
                         $n->and->equalTo(1, 0, ExpressionInterface::TYPE_VALUE);
                     }
                     $n->and->equalTo(
@@ -592,17 +644,20 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             $select->where->addPredicate($existingWhere);
         }
         
-        \Ruga\Log::addLog("SQL={$select->getSqlString($iTable->getAdapter()->getPlatform())}", \Ruga\Log\Severity::DEBUG);
+        \Ruga\Log::addLog(
+            "SQL={$select->getSqlString($iTable->getAdapter()->getPlatform())}",
+            \Ruga\Log\Severity::DEBUG
+        );
         $iRowset = $iTable->selectWith($select);
         
         
         // Update manyToManyRows cache
         /** @var RowInterface $iRow */
-        foreach($iRowset as $iRow) {
+        foreach ($iRowset as $iRow) {
             $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
         }
         
-        $a=$this->manyToManyRowListGetIRows($mRow,$iTable,$nTableConstraint['NAME'],$mTableConstraint['NAME']);
+        $a = $this->manyToManyRowListGetIRows($mRow, $iTable, $nTableConstraint['NAME'], $mTableConstraint['NAME']);
         
         // Must re-initialize ResultSet to keep reference to the rows
         $iRowset->initialize($a);
