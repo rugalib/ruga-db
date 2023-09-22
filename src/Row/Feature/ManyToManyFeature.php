@@ -436,13 +436,13 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $manyToManyTableConstraints = $this->resolveManyToManyTableConstraints($parentTable, $dependentTable, $ruleKey);
         if (count($manyToManyTableConstraints) > 1) {
             throw new TooManyConstraintsException(
-                "More than 1 constraints found for relation {$parentTable->getTable()} ||--o{ {$dependentTable->getTableGateway()->getTable()}: "
+                "More than 1 constraints found for relation {$parentTable->getTable()} ||--o{ {$dependentTable->getTable()}: "
                 . implode(', ', array_map(static fn($item) => $item['NAME'], $manyToManyTableConstraints))
             );
         }
         if (count($manyToManyTableConstraints) < 1) {
             throw new NoConstraintsException(
-                "No constraints found for relation {$parentTable->getTable()} ||--o{ {$dependentTable->getTableGateway()->getTable()}"
+                "No constraints found for relation {$parentTable->getTable()} ||--o{ {$dependentTable->getTable()}"
             );
         }
         
