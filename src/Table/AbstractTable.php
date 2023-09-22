@@ -106,7 +106,7 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
         $this->adapter = $adapter;
         
         if (!$features) {
-            $features = new FeatureSet();
+            $features = new \Ruga\Db\Table\Feature\FeatureSet();
         }
         $features = $this->initFeatures($features);
         
@@ -378,6 +378,13 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
     public function getMetadataCache(): StorageInterface
     {
         return $this->metadataCache;
+    }
+    
+    
+    
+    public function getFeatureSet(): \Ruga\Db\Table\Feature\FeatureSet
+    {
+        return $this->featureSet;
     }
     
     
