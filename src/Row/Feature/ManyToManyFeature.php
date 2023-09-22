@@ -228,9 +228,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $nConstraintName = $iTableConstraint['NAME'];
         
         $iUniqueid = implode('-', $iRow->primaryKeyData ?? []);
-        if (empty($iUniqueid)) {
-            $iUniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->manyToManyRows[$nConstraintName] ?? []));
-        }
+        $iUniqueid = empty($iUniqueid) ? '?'.spl_object_hash($iRow) : $iUniqueid;
         $iUniqueid .= '@' . get_class($iRow);
         
         $this->manyToManyRows[$nConstraintName][$iUniqueid]['uniqueid'] = $iUniqueid;
@@ -243,16 +241,11 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mConstraintName);
         $mConstraintName = $mTableConstraint['NAME'];
         
+
         $mUniqueid = implode('-', $mRow->primaryKeyData ?? []);
-        if (empty($mUniqueid)) {
-            $mUniqueid = '?' . date('U') . '?' . sprintf(
-                    '%05u',
-                    count(
-                        $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName] ?? []
-                    )
-                );
-        }
+        $mUniqueid = empty($mUniqueid) ? '?'.spl_object_hash($mRow) : $mUniqueid;
         $mUniqueid .= '@' . get_class($mRow);
+        
         $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['uniqueid'] = $mUniqueid;
         $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['action'] = $action;
         $this->manyToManyRows[$nConstraintName][$iUniqueid]['m'][$mConstraintName][$mUniqueid]['mRow'] = $mRow;

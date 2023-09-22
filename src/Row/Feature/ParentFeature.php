@@ -180,10 +180,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         $constraintName = $dependentTableConstraint['NAME'];
         
         $uniqueid = implode('-', $dependentRow->primaryKeyData ?? []);
-        if (empty($uniqueid)) {
-            $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->dependentRows[$constraintName] ?? []));
-        }
-        
+        $uniqueid = empty($uniqueid) ? '?'.spl_object_hash($dependentRow) : $uniqueid;
         $uniqueid .= '@' . get_class($dependentRow);
         
         if (!array_key_exists($uniqueid, $this->dependentRows[$constraintName] ?? [])) {
@@ -193,7 +190,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         }
         
         // Update action
-        if($action) {
+        if ($action) {
             $this->dependentRows[$constraintName][$uniqueid]['action'] = $action;
         }
     }

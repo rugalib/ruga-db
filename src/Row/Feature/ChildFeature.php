@@ -139,10 +139,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         }
         
         $uniqueid = implode('-', $parentRow->primaryKeyData ?? []);
-        if (empty($uniqueid)) {
-            $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->parentRows[$constraintName] ?? []));
-        }
-        
+        $uniqueid = empty($uniqueid) ? '?'.spl_object_hash($parentRow) : $uniqueid;
         $uniqueid .= '@' . get_class($parentRow);
         
         // Only add row if it does not already exist in cache

@@ -267,6 +267,38 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertCount(1, $items);
     }
     
+    public function testCanUnlinkDependentRowUnsaved()
+    {
+        $parentTable = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\MetaDefault $parentRow */
+        $parentRow = $parentTable->findById(5)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $parentRow);
+        $this->assertSame('5', "{$parentRow->id}");
+        $this->assertSame('data 5', $parentRow->data);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
+        
+        $parentRow->linkDependentRow($dependentRow);
+//        $dependentRow->save();
+        unset($dependentRow);
+        
+        $items = $parentRow->findDependentRowset(MusterTable::class);
+        $this->assertCount(2, $items);
+        
+        $dependentRow = $parentRow->findDependentRowset(
+            MusterTable::class,
+            null,
+            (new Select())->where("`id`=1")
+        )->current();
+        $this->assertInstanceOf(Muster::class, $dependentRow);
+        
+        $parentRow->unlinkDependentRow($dependentRow);
+//        $dependentRow->save();
+        
+        $items = $parentRow->findDependentRowset(MusterTable::class);
+        $this->assertCount(1, $items);
+    }
     
     
     public function testCanNotUnlinkDependentRow()
