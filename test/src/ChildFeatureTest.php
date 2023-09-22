@@ -152,6 +152,24 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    public function testCanUnlinkParentRowWithoutSaving()
+    {
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        /** @var Muster $dependentRow */
+        $dependentRow = $dependentTable->findById(1)->current();
+        
+        $parentRow = $dependentRow->findParentRow(MetaDefaultTable::class);
+        
+        $dependentRow->unlinkParentRow(MetaDefaultTable::class);
+//        $dependentRow->save();
+        
+        $items = $parentRow->findDependentRowset(MusterTable::class);
+        $this->assertCount(0, $items);
+        
+        $this->assertNull($dependentRow->Simple_id);
+    }
+    
+    
     
     public function testCanDeleteParentRow()
     {
@@ -171,6 +189,79 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    public function testCanDeleteParentRowWithoutSaving()
+    {
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        /** @var Muster $dependentRow */
+        $dependentRow = $dependentTable->findById(1)->current();
+        
+        $parentRow = $dependentRow->findParentRow(MetaDefaultTable::class);
+        
+        $dependentRow->deleteParentRow(MetaDefaultTable::class);
+//        $dependentRow->save();
+        
+        // no dependent rows, because parent is "deleted" (not really, as save() was not called)
+        $items = $parentRow->findDependentRowset(MusterTable::class);
+        $this->assertCount(0, $items);
+        $this->assertNull($dependentRow->Simple_id);
+        
+        // now the parent row is really deleted
+        $dependentRow->save();
+        $parentTable = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        /** @var MetaDefault $parentRow */
+        $parentRow = $parentTable->findById(5)->current();
+        $this->assertNull($parentRow);
+        $this->assertNull($dependentRow->Simple_id);
+    }
     
+    
+    
+    public function testCanFindParentUnsaved()
+    {
+        $parentTable = new \Ruga\Db\Test\Model\CartTable($this->getAdapter());
+        /** @var Cart $parentRow */
+        $parentRow = $parentTable->findById(2)->current(2);
+        
+        $dependentTable = new \Ruga\Db\Test\Model\CartItemTable($this->getAdapter());
+        /** @var CartItem $dependentRow7 */
+        $dependentRow7 = $dependentTable->createRow(['fullname' => 'cart 2, item 7', 'seq' => 7]);
+        $parentRow->linkDependentRow($dependentRow7);
+        
+        /** @var CartItem $dependentRow8 */
+        $dependentRow8 = $dependentTable->createRow(['fullname' => 'cart 2, item 8', 'seq' => 8]);
+        $parentRow->linkDependentRow($dependentRow8);
+        
+//        $parentRow->save();
+        
+        // find dependent rows via parent
+        $items = $parentRow->findDependentRowset(CartItemTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount(8, $items);
+        echo PHP_EOL;
+        
+        
+        // find parent via unsaved depenedent row
+        /** @var Cart $p */
+        $p = $dependentRow8->findParentRow(CartTable::class);
+        print_r($p->idname);
+        echo PHP_EOL;
+        $this->assertInstanceOf(Cart::class, $p);
+        echo PHP_EOL;
+        
+        
+        // find dependent rows via found parent
+        $items = $p->findDependentRowset(CartItemTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount(8, $items);
+        echo PHP_EOL;
+    }
     
 }

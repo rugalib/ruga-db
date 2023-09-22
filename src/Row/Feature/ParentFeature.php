@@ -162,15 +162,19 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      * Add $dependentRow to the internal list of children. Also called by ChildFeature to add the child to the parent's
      * list.
      *
-     * @param RowInterface $dependentRow
-     * @param string       $constraintName
-     * @param string       $action
+     * @param RowInterface|null $dependentRow
+     * @param string            $constraintName
+     * @param string|null       $action
      *
      * @return void
      * @throws \Exception
      */
-    public function dependentRowListAdd(RowInterface $dependentRow, string $constraintName, string $action = 'save')
+    public function dependentRowListAdd(?RowInterface $dependentRow, string $constraintName, ?string $action = null)
     {
+        if ($dependentRow === null) {
+            return;
+        }
+        
         $dependentTable = $this->resolveDependentTable($dependentRow);
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $constraintName);
         $constraintName = $dependentTableConstraint['NAME'];
@@ -182,9 +186,16 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         
         $uniqueid .= '@' . get_class($dependentRow);
         
-        $this->dependentRows[$constraintName][$uniqueid]['uniqueid'] = $uniqueid;
-        $this->dependentRows[$constraintName][$uniqueid]['action'] = $action;
-        $this->dependentRows[$constraintName][$uniqueid]['dependentRow'] = $dependentRow;
+        if (!array_key_exists($uniqueid, $this->dependentRows[$constraintName] ?? [])) {
+            $this->dependentRows[$constraintName][$uniqueid]['dependentRow'] = $dependentRow;
+            $this->dependentRows[$constraintName][$uniqueid]['uniqueid'] = $uniqueid;
+            $this->dependentRows[$constraintName][$uniqueid]['action'] = $action ?? 'save';
+        }
+        
+        // Update action
+        if($action) {
+            $this->dependentRows[$constraintName][$uniqueid]['action'] = $action;
+        }
     }
     
     
@@ -200,7 +211,9 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     {
         $a = [];
         foreach (($this->dependentRows[$constraintName] ?? []) as $uniqueid => $depententRowInfo) {
-            $a[] = $depententRowInfo['dependentRow'];
+            if (($depententRowInfo['action'] ?? '') == 'save') {
+                $a[] = $depententRowInfo['dependentRow'];
+            }
         }
         return $a;
     }
@@ -322,7 +335,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      *
      * @return void
      */
-    private function addParentToChild(RowInterface $dependentRow, string $constraintName, string $action = 'save')
+    private function addParentToChild(RowInterface $dependentRow, string $constraintName, ?string $action = null)
     {
         if ($dependentRow instanceof ChildFeatureAttributesInterface) {
             $dependentRow->parentRowListAdd($this->rowGateway, $constraintName, $action);
@@ -435,8 +448,8 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         $dependentRow = $dependentTable->createRow($rowData);
         
         // Add dependent row to list for later saving
-        $this->dependentRowListAdd($dependentRow, $dependentTableConstraint['NAME']);
-        $this->addParentToChild($dependentRow, $dependentTableConstraint['NAME']);
+        $this->dependentRowListAdd($dependentRow, $dependentTableConstraint['NAME'], 'save');
+        $this->addParentToChild($dependentRow, $dependentTableConstraint['NAME'], 'save');
         
         return $dependentRow;
     }
@@ -491,8 +504,8 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         }
         
         // Add dependent row to list for later saving
-        $this->dependentRowListAdd($dependentRow, $dependentTableConstraint['NAME']);
-        $this->addParentToChild($dependentRow, $dependentTableConstraint['NAME']);
+        $this->dependentRowListAdd($dependentRow, $dependentTableConstraint['NAME'], 'save');
+        $this->addParentToChild($dependentRow, $dependentTableConstraint['NAME'], 'save');
         
         return $dependentRow;
     }

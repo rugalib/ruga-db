@@ -126,14 +126,18 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      * Add $parentRow to the internal list of parents. Also called by ParentFeature to add the parent to the child's
      * list.
      *
-     * @param RowInterface $parentRow
-     * @param string       $constraintName
-     * @param string       $action
+     * @param RowInterface|null $parentRow
+     * @param string            $constraintName
+     * @param string|null       $action
      *
      * @return void
      */
-    public function parentRowListAdd(RowInterface $parentRow, string $constraintName, string $action = 'save')
+    public function parentRowListAdd(?RowInterface $parentRow, string $constraintName, ?string $action = null)
     {
+        if ($parentRow === null) {
+            return;
+        }
+        
         $uniqueid = implode('-', $parentRow->primaryKeyData ?? []);
         if (empty($uniqueid)) {
             $uniqueid = '?' . date('U') . '?' . sprintf('%05u', count($this->parentRows[$constraintName] ?? []));
@@ -141,9 +145,36 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         
         $uniqueid .= '@' . get_class($parentRow);
         
-        $this->parentRows[$constraintName][$uniqueid]['uniqueid'] = $uniqueid;
-        $this->parentRows[$constraintName][$uniqueid]['action'] = $action;
-        $this->parentRows[$constraintName][$uniqueid]['parentRow'] = $parentRow;
+        // Only add row if it does not already exist in cache
+        if (!array_key_exists($uniqueid, $this->parentRows[$constraintName] ?? [])) {
+            $this->parentRows[$constraintName][$uniqueid]['parentRow'] = $parentRow;
+            $this->parentRows[$constraintName][$uniqueid]['uniqueid'] = $uniqueid;
+            $this->parentRows[$constraintName][$uniqueid]['action'] = $action ?? 'save';
+        }
+        
+        // Update action
+        if ($action) {
+            $this->parentRows[$constraintName][$uniqueid]['action'] = $action;
+        }
+    }
+    
+    
+    
+    /**
+     * Get the cached parent row.
+     *
+     * @param string $constraintName
+     *
+     * @return RowInterface|null
+     */
+    private function parentRowListGet(string $constraintName): ?RowInterface
+    {
+        foreach (($this->parentRows[$constraintName] ?? []) as $uniqueid => $parentInfo) {
+            if (($parentInfo['action'] ?? '') == 'save') {
+                return $parentInfo['parentRow'] ?? null;
+            }
+        }
+        return null;
     }
     
     
@@ -262,7 +293,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      *
      * @return void
      */
-    private function addChildToParent(RowInterface $parentRow, string $constraintName, string $action = 'save')
+    private function addChildToParent(RowInterface $parentRow, string $constraintName, ?string $action = null)
     {
         if ($parentRow instanceof ParentFeatureAttributesInterface) {
             $parentRow->dependentRowListAdd($this->rowGateway, $constraintName, $action);
@@ -278,10 +309,10 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      * @param string|null $ruleKey
      * @param Select|null $select
      *
-     * @return RowInterface
+     * @return RowInterface|null
      * @throws \Exception
      */
-    public function findParentRow($parentTable, ?string $ruleKey = null, ?Select $select = null): RowInterface
+    public function findParentRow($parentTable, ?string $ruleKey = null, ?Select $select = null): ?RowInterface
     {
         $parentTable = $this->resolveTableArgument($parentTable);
         $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
@@ -316,14 +347,16 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
             $select->where->addPredicate($existingWhere);
         }
         
-        \Ruga\Log::addLog("SQL={$select->getSqlString($parentTable->getAdapter()->getPlatform())}");
+        \Ruga\Log::addLog(
+            "SQL={$select->getSqlString($parentTable->getAdapter()->getPlatform())}",
+            \Ruga\Log\Severity::DEBUG
+        );
         $parentRow = $parentTable->selectWith($select)->current();
         
         // Add parent row to list
         $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME']);
-        $this->addChildToParent($parentRow, $parentTableConstraint['NAME']);
         
-        return $parentRow;
+        return $this->parentRowListGet($parentTableConstraint['NAME']);
     }
     
     
@@ -347,8 +380,8 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         // No foreign key yet!
         
         // Add parent row to list
-        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME']);
-        $this->addChildToParent($parentRow, $parentTableConstraint['NAME']);
+        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME'], 'save');
+        $this->addChildToParent($parentRow, $parentTableConstraint['NAME'], 'save');
         
         return $parentRow;
     }
@@ -402,8 +435,8 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         }
         
         // Add parent row to list
-        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME']);
-        $this->addChildToParent($parentRow, $parentTableConstraint['NAME']);
+        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME'], 'save');
+        $this->addChildToParent($parentRow, $parentTableConstraint['NAME'], 'save');
         
         return $parentRow;
     }
@@ -416,7 +449,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      * @param mixed       $parentTable
      * @param string|null $ruleKey
      *
-     * @return RowInterface
+     * @return RowInterface The former parent row
      * @throws \Exception
      */
     public function unlinkParentRow($parentTable, ?string $ruleKey = null): RowInterface

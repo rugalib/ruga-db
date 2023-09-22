@@ -16,7 +16,7 @@ use Ruga\Db\Row\RowInterface;
  * Interface ChildFeatureAttributesInterface
  * @see ChildFeature
  *
- * @method RowInterface findParentRow($parentTable, ?string $ruleKey = null, ?Select $select = null) Find the parent row.
+ * @method RowInterface|null findParentRow($parentTable, ?string $ruleKey = null, ?Select $select = null) Find the parent row.
  * @method RowInterface createParentRow($parentTable, array $rowData = [], ?string $ruleKey = null) Create a new parent row.
  * @method RowInterface linkParentRow(RowInterface $parentRow, ?string $ruleKey = null) Link parent to this dependent row.
  * @method RowInterface unlinkParentRow($parentTable, ?string $ruleKey = null) Remove relation between this row and the given parent.
