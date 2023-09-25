@@ -10,6 +10,7 @@ namespace Ruga\Db\Row\Feature;
 
 use Laminas\Db\Adapter\Driver\ResultInterface;
 use Laminas\Db\ResultSet\ResultSetInterface;
+use Laminas\Db\Sql\ExpressionInterface;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
 use Ruga\Db\Adapter\Adapter;
@@ -17,6 +18,7 @@ use Ruga\Db\ResultSet\ResultSet;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
+use Ruga\Db\Row\Exception\NoDefaultValueException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
 use Ruga\Db\Table\Feature\MetadataFeature;
@@ -337,9 +339,15 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
             function (Where $where) use ($parentTableConstraint, $row) {
                 $n = $where->NEST;
                 foreach ($parentTableConstraint['REF_COLUMNS'] as $colPos => $column) {
+                    try {
+                        $rightVal = $row->offsetGet($parentTableConstraint['COLUMNS'][$colPos]);
+                    } catch (NoDefaultValueException $e) {
+                        $rightVal = 'dependentRow_IS_NEW';
+                        $n->and->equalTo(1, 0, ExpressionInterface::TYPE_VALUE);
+                    }
                     $n->and->equalTo(
                         "{$parentTableConstraint['REF_TABLE']}.{$column}",
-                        $row->offsetGet($parentTableConstraint['COLUMNS'][$colPos])
+                        $rightVal
                     );
                 }
             }
