@@ -152,6 +152,7 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
     public function testCanUnlinkParentRowWithoutSaving()
     {
         $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
@@ -187,6 +188,7 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         
         $this->assertNull($dependentRow->Simple_id);
     }
+    
     
     
     public function testCanDeleteParentRowWithoutSaving()
@@ -230,7 +232,7 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         /** @var CartItem $dependentRow8 */
         $dependentRow8 = $dependentTable->createRow(['fullname' => 'cart 2, item 8', 'seq' => 8]);
         $parentRow->linkDependentRow($dependentRow8);
-        
+
 //        $parentRow->save();
         
         // find dependent rows via parent
@@ -263,5 +265,27 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertCount(8, $items);
         echo PHP_EOL;
     }
+    
+    
+    
+    public function testCanCreateAndFindUnsavedParentFromChild()
+    {
+        $dependentTable = new \Ruga\Db\Test\Model\CartItemTable($this->getAdapter());
+        /** @var CartItem $dependentRow */
+        $dependentRow = $dependentTable->createRow(['fullname' => 'new cart, item 1', 'seq' => 1]);
+        
+        /** @var Cart $cart */
+        $cart = $dependentRow->findParentRow(CartTable::class);
+        $this->assertNull($cart);
+        
+        /** @var Cart $cart */
+        $cart = $dependentRow->createParentRow(CartTable::class);
+        $this->assertInstanceOf(Cart::class, $cart);
+        
+        /** @var Cart $foundcart */
+        $foundcart = $dependentRow->findParentRow(CartTable::class);
+        $this->assertInstanceOf(Cart::class, $foundcart);
+    }
+    
     
 }
