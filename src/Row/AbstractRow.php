@@ -510,13 +510,13 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
                 ',',
                 array_map(
                     function ($val) {
-                        return $val;
+                        return strval($val);
                     },
                     $value
                 )
             );
         }
-        return $value;
+        return strval($value);
     }
     
     
