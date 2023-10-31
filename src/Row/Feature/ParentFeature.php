@@ -32,9 +32,7 @@ use Ruga\Db\Table\TableInterface;
 class ParentFeature extends AbstractFeature implements ParentFeatureAttributesInterface
 {
     private ?MetadataFeature $metadataFeature = null;
-    
     private $dependentRows = [];
-    
     private array $postPopulateRowData = [];
     private array $postPopulateLinks = [];
     
@@ -611,7 +609,10 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             } catch (ServiceNotFoundException $e) {
                 // Create table instance from uniqueid in $value
                 /** @var AbstractRugaRow $row */
-                $row=$this->rowGateway->getTableGateway()->getAdapter()->rowFactory(is_array($value) ? $value[0] : $value);
+                $row = $this->rowGateway->getTableGateway()->getAdapter()->rowFactory(
+                    is_array($value) ? $value[0] : $value
+                );
+                /** @var AbstractRugaTable $dependentTable */
                 $dependentTable = $row->getTableGateway();
             }
             

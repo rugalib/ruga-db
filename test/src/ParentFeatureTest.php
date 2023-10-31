@@ -656,6 +656,11 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     
     /**
      * @dataProvider linkParamProvider
+     *
+     * @param $linkParamName
+     * @param $linkParamValue
+     * @param $count
+     *
      * @return void
      * @throws \Exception
      */
@@ -690,16 +695,16 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     public function linkParamProvider(): array
     {
         return [
-            ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', 2, 1],
-            ['linkDependentRow(MusterTable)', 2, 1],
-            ['linkDependentRow()', '2@MusterTable', 1],
-            ['linkDependentRow()', ['2@MusterTable', '1@MusterTable'], 2],
-            ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', [1,2], 2],
-            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', 2, 1],
-            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', [2,1], 2],
-            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable:fullname', 'Hallo Welt', 1],
-            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable:fullname', ['Hallo Welt','Linked to table Simple'], 2],
-            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', 'new', 1],
+            '(FQCN)' => ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', 2, 1],
+            '(Alias)' => ['linkDependentRow(MusterTable)', 2, 1],
+            '()=uniqueid' => ['linkDependentRow()', '2@MusterTable', 1],
+            '()=[uniqueid]' => ['linkDependentRow()', ['2@MusterTable', '1@MusterTable'], 2],
+            '(FQCN)=[id]' => ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', [1,2], 2],
+            ':FQCN' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', 2, 1],
+            ':FQCN=[id]' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', [2,1], 2],
+            ':FQCN:fullname' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable:fullname', 'Hallo Welt', 1],
+            ':FQCN:fullname=[]' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable:fullname', ['Hallo Welt','Linked to table Simple'], 2],
+            ':FQCN=new' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', 'new', 1],
         ];
     }
     

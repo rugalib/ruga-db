@@ -288,4 +288,58 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     }
     
     
+    
+    /**
+     * @dataProvider linkParamProvider
+     *
+     * @param $linkParamName
+     * @param $linkParamValue
+     * @param $count
+     *
+     * @return void
+     * @throws \Exception
+     */
+    function testCanCreateRowWithLinkParam($linkParamName, $linkParamValue, $count)
+    {
+        $parentTable = new \Ruga\Db\Test\Model\CartTable($this->getAdapter());
+        /** @var Cart $parentRow */
+        $parentRow = $parentTable->findById(2)->current(2);
+        
+        
+        $dependentTable = new \Ruga\Db\Test\Model\CartItemTable($this->getAdapter());
+        /** @var CartItem $dependentRow */
+        $dependentRow = $dependentTable->createRow([
+                                                       'fullname' => 'cart 2, item 7',
+                                                       'seq' => 7,
+                                                       $linkParamName => $linkParamValue,
+                                                       ]);
+        $dependentRow->save();
+        
+        $items = $parentRow->findDependentRowset(CartItemTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount($count, $items);
+    }
+    
+    
+    
+    public function linkParamProvider(): array
+    {
+        return [
+            '(FQCN)' => ['linkParentRow(\Ruga\Db\Test\Model\CartTable)', 2, 7],
+            ':FQCN' => ['linkParentRow():\Ruga\Db\Test\Model\CartTable', 2, 7],
+            ':FQCN:fullname' => ['linkParentRow():\Ruga\Db\Test\Model\CartTable:fullname', 'cart 2', 7],
+            '(FQCN):fullname' => ['linkParentRow(\Ruga\Db\Test\Model\CartTable):fullname', 'cart 2', 7],
+            '(Alias)' => ['linkParentRow(CartTable)', 2, 7],
+            ':Alias' => ['linkParentRow():CartTable', 2, 7],
+            '(Alias):fullname' => ['linkParentRow(CartTable):fullname', 'cart 2', 7],
+            ':Alias:fullname' => ['linkParentRow():CartTable:fullname', 'cart 2', 7],
+            '()=uniqueid' => ['linkParentRow()', '2@CartTable', 7],
+//            '(Alias)=new' => ['linkParentRow(CartTable)', 'new', 1],   // Not possible
+        ];
+    }
+    
 }

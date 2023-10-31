@@ -13,14 +13,17 @@ use Laminas\Db\ResultSet\ResultSetInterface;
 use Laminas\Db\Sql\ExpressionInterface;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
+use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\ResultSet\ResultSet;
+use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\NoDefaultValueException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
+use Ruga\Db\Table\AbstractRugaTable;
 use Ruga\Db\Table\Feature\MetadataFeature;
 use Ruga\Db\Table\TableInterface;
 
@@ -30,8 +33,9 @@ use Ruga\Db\Table\TableInterface;
 class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInterface
 {
     private ?MetadataFeature $metadataFeature = null;
-    
     private $parentRows = [];
+    private array $postPopulateRowData = [];
+    private array $postPopulateLinks = [];
     
     
     
@@ -481,6 +485,94 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         $this->addChildToParent($parentRow, $parentTableConstraint['NAME'], 'unlink');
         
         return $parentRow;
+    }
+    
+    
+    
+    /**
+     * Store the relevant parameters in this feature for postPopulate().
+     *
+     * @param array $rowData
+     * @param bool  $rowExistsInDatabase
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function prePopulate(array &$rowData, bool &$rowExistsInDatabase)
+    {
+        \Ruga\Log::functionHead($this);
+        
+        foreach ($rowData as $param => $value) {
+            if (strpos($param, 'linkParentRow(') !== false) {
+                $this->postPopulateLinks[$param] = $value;
+                unset($rowData[$param]);
+            }
+        }
+        
+        $this->postPopulateRowData = &$rowData;
+    }
+    
+    
+    
+    /**
+     * Link the entities given in parameters.
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function postPopulate()
+    {
+        \Ruga\Log::functionHead($this);
+        
+        foreach ($this->postPopulateLinks as $param => $value) {
+            unset($this->postPopulateLinks[$param]);
+            // Extract data from parameter name
+            [$parentTableName, $parentKeyName] = (function (string $param): array {
+                $m = null;
+                preg_match('/^linkParentRow\(([a-zA-z_]*)\)(\:([a-zA-z_]*)(\:([a-zA-z_]*)|)|)$/', $param, $m);
+                if (empty($m[1] ?? null)) {
+                    return [$m[3] ?? null, $m[5] ?? null];
+                }
+                return [$m[1], $m[5] ?? $m[3] ?? null];
+            })(
+                $param
+            );
+            
+            // Create table instance
+            try {
+                /** @var AbstractRugaTable $parentTable */
+                $parentTable = $this->rowGateway->getTableGateway()->getAdapter()->tableFactory(
+                    strval($parentTableName)
+                );
+            } catch (ServiceNotFoundException $e) {
+                // Create table instance from uniqueid in $value
+                /** @var AbstractRugaRow $row */
+                $row = $this->rowGateway->getTableGateway()->getAdapter()->rowFactory(
+                    is_array($value) ? $value[0] : $value
+                );
+                /** @var AbstractRugaTable $parentTable */
+                $parentTable = $row->getTableGateway();
+            }
+            
+            // Find dependent rows
+            if (empty($parentKeyName)) {
+                $parentRows = $parentTable->findById($value);
+            } else {
+                $parentRows = $parentTable->select([$parentKeyName => $value]);
+            }
+            
+            if ($parentRows->count() > 0) {
+                // Link dependent rows
+                /** @var AbstractRugaRow $parentRow */
+                foreach ($parentRows as $parentRow) {
+                    $this->rowGateway->linkParentRow($parentRow);
+                }
+            } elseif ($value == 'new') {
+                // No dependent rows found, but new row is requested
+                $parentRow = $parentTable->createRow($this->postPopulateRowData);
+                $this->rowGateway->linkParentRow($parentRow);
+            }
+        }
     }
     
     
