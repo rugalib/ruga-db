@@ -267,6 +267,8 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertCount(1, $items);
     }
     
+    
+    
     public function testCanUnlinkDependentRowUnsaved()
     {
         $parentTable = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
@@ -299,6 +301,7 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $items = $parentRow->findDependentRowset(MusterTable::class);
         $this->assertCount(1, $items);
     }
+    
     
     
     public function testCanNotUnlinkDependentRow()
@@ -648,5 +651,58 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         }
         $this->assertCount(4, $items);
     }
+    
+    
+    
+    /**
+     * @dataProvider linkParamProvider
+     * @return void
+     * @throws \Exception
+     */
+    public function testCanCreateRowWithLinkParam($linkParamName, $linkParamValue, $count)
+    {
+        $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
+        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
+        $dependentRow->save();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Muster::class, $dependentRow);
+        
+        $t = new \Ruga\Db\Test\Model\MetaDefaultTable($this->getAdapter());
+        
+        /** @var \Ruga\Db\Test\Model\MetaDefault $row */
+        $row = $t->createRow([
+                                 'data' => 'data 8',
+                                 $linkParamName => $linkParamValue,
+                             ]);
+        $row->save();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
+        $this->assertSame('8', "{$row->id}");
+        $this->assertSame('data 8', $row->data);
+        
+        $items = $row->findDependentRowset(MusterTable::class);
+        /** @var RowInterface $item */
+        foreach ($items as $item) {
+            print_r($item->idname);
+            echo PHP_EOL;
+        }
+        $this->assertCount($count, $items);
+    }
+    
+    public function linkParamProvider(): array
+    {
+        return [
+            ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', 2, 1],
+            ['linkDependentRow(MusterTable)', 2, 1],
+            ['linkDependentRow()', '2@MusterTable', 1],
+            ['linkDependentRow()', ['2@MusterTable', '1@MusterTable'], 2],
+            ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', [1,2], 2],
+            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', 2, 1],
+            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', [2,1], 2],
+            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable:fullname', 'Hallo Welt', 1],
+            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable:fullname', ['Hallo Welt','Linked to table Simple'], 2],
+            ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', 'new', 1],
+        ];
+    }
+    
+    
     
 }
