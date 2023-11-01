@@ -414,23 +414,8 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     {
         $parentTable = $this->resolveTableArgument($parentTable);
         $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
+        
         $parentRow = $this->unlinkParentRow($parentTable, $ruleKey);
-        
-        // Unset the parent from the child (for use by the application)
-        try {
-            $offset = "{$parentTableConstraint['NAME']}|{$this->rowUniqueid($parentRow)}";
-            $this->rowGateway->offsetUnset($offset);
-        } catch (InvalidColumnException $e) {
-            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($this->rowGateway));
-        }
-        
-        // Unset the child from the parent (for use by the application)
-        try {
-            $offset = "{$parentTableConstraint['NAME']}|{$this->rowUniqueid($this->rowGateway)}";
-            $parentRow->offsetUnset($offset);
-        } catch (InvalidColumnException $e) {
-            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($parentRow));
-        }
         
         // Add parent row to list
         $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME'], 'delete');

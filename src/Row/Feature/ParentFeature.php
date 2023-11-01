@@ -18,6 +18,7 @@ use ReflectionException;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
+use Ruga\Db\Row\Exception\InvalidColumnException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\NoDefaultValueException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
@@ -32,30 +33,12 @@ use Ruga\Db\Table\TableInterface;
 class ParentFeature extends AbstractFeature implements ParentFeatureAttributesInterface
 {
     use ParseStringArgTrait;
+    use RowUniqueidTrait;
     
     private ?MetadataFeature $metadataFeature = null;
     private $dependentRows = [];
     private array $postPopulateRowData = [];
     private array $postPopulateLinks = [];
-    
-    
-    
-    private function getMetadataFeature(): MetadataFeature
-    {
-        if ($this->metadataFeature === null) {
-            $this->metadataFeature = $this->rowGateway->getTableGateway()->getFeatureSet()->getFeatureByClassName(
-                MetadataFeature::class
-            );
-            if (!$this->metadataFeature || !($this->metadataFeature instanceof MetadataFeature)) {
-                throw new Exception(
-                    get_class($this) . " requires " . MetadataFeature::class . " in " . get_class(
-                        $this->getTableGateway()
-                    )
-                );
-            }
-        }
-        return $this->metadataFeature;
-    }
     
     
     
@@ -187,9 +170,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         $dependentTableConstraint = $this->getDependentTableConstraint($dependentTable, $constraintName);
         $constraintName = $dependentTableConstraint['NAME'];
         
-        $uniqueid = implode('-', $dependentRow->primaryKeyData ?? []);
-        $uniqueid = empty($uniqueid) ? '?' . spl_object_hash($dependentRow) : $uniqueid;
-        $uniqueid .= '@' . get_class($dependentRow);
+        $uniqueid = $this->rowUniqueid($dependentRow);
         
         if (!array_key_exists($uniqueid, $this->dependentRows[$constraintName] ?? [])) {
             $this->dependentRows[$constraintName][$uniqueid]['dependentRow'] = $dependentRow;
@@ -459,9 +440,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         
         $dependentRow = $dependentTable->createRow($rowData);
         
-        // Add dependent row to list for later saving
-        $this->dependentRowListAdd($dependentRow, $dependentTableConstraint['NAME'], 'save');
-        $this->addParentToChild($dependentRow, $dependentTableConstraint['NAME'], 'save');
+        $this->linkDependentRow($dependentRow, $dependentTableConstraint['NAME']);
         
         return $dependentRow;
     }
@@ -517,6 +496,22 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             \Ruga\Log::addLog("parentRow is NEW", \Ruga\Log\Severity::DEBUG);
         }
         
+        // Present the dependent row to the parent (for use by the application)
+        try {
+            $offset = "{$dependentTableConstraint['NAME']}|{$this->rowUniqueid($dependentRow)}";
+            $this->rowGateway->offsetSet($offset, $dependentRow);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($this->rowGateway));
+        }
+        
+        // Present the parent to the dependent row (for use by the application)
+        try {
+            $offset = "{$dependentTableConstraint['NAME']}|{$this->rowUniqueid($this->rowGateway)}";
+            $dependentRow->offsetSet($offset, $this->rowGateway);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($dependentRow));
+        }
+        
         // Add dependent row to list for later saving
         $this->dependentRowListAdd($dependentRow, $dependentTableConstraint['NAME'], 'save');
         $this->addParentToChild($dependentRow, $dependentTableConstraint['NAME'], 'save');
@@ -542,6 +537,22 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         
         foreach ($dependentTableConstraint['COLUMNS'] as $column) {
             $dependentRow->offsetSet($column, null);
+        }
+        
+        // Unset the child from the parent (for use by the application)
+        try {
+            $offset = "{$dependentTableConstraint['NAME']}|{$this->rowUniqueid($dependentRow)}";
+            $this->rowGateway->offsetUnset($offset);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($this->rowGateway));
+        }
+        
+        // Unset the parent from the child (for use by the application)
+        try {
+            $offset = "{$dependentTableConstraint['NAME']}|{$this->rowUniqueid($this->rowGateway)}";
+            $dependentRow->offsetUnset($offset);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($dependentRow));
         }
         
         // Add dependent row to list for later saving
@@ -602,13 +613,13 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             
             [$dependentTable, $dependentKeyName, $dependentRows] = $this->parseArg($arg1, $value);
             
-            if((count($dependentRows) == 0) && ($value == 'new')) {
+            if ((count($dependentRows) == 0) && ($value == 'new')) {
                 $dependentRowData = $this->postPopulateRowData[get_class($dependentTable)] ?? [];
                 $this->createDependentRow($dependentTable, $dependentRowData);
             }
             
             /** @var AbstractRugaRow $dependentRow */
-            foreach($dependentRows as $dependentRow) {
+            foreach ($dependentRows as $dependentRow) {
                 $this->linkDependentRow($dependentRow);
             }
         }
