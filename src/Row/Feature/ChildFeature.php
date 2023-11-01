@@ -32,6 +32,8 @@ use Ruga\Db\Table\TableInterface;
  */
 class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInterface
 {
+    use ParseStringArgTrait;
+    
     private ?MetadataFeature $metadataFeature = null;
     private $parentRows = [];
     private array $postPopulateRowData = [];
@@ -527,50 +529,25 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         foreach ($this->postPopulateLinks as $param => $value) {
             unset($this->postPopulateLinks[$param]);
             // Extract data from parameter name
-            [$parentTableName, $parentKeyName] = (function (string $param): array {
+            [$arg1, $arg2] = (function (string $param): array {
                 $m = null;
-                preg_match('/^linkParentRow\(([a-zA-z_]*)\)(\:([a-zA-z_]*)(\:([a-zA-z_]*)|)|)$/', $param, $m);
-                if (empty($m[1] ?? null)) {
-                    return [$m[3] ?? null, $m[5] ?? null];
-                }
-                return [$m[1], $m[5] ?? $m[3] ?? null];
+                preg_match('/\(([^)]*)\)/', $param, $m);
+                $aArgs = preg_split('/\s*,\s*/', $m[1] ?? '');
+                return [$aArgs[0] ?? null, $aArgs[1] ?? null];
             })(
                 $param
             );
             
-            // Create table instance
-            try {
-                /** @var AbstractRugaTable $parentTable */
-                $parentTable = $this->rowGateway->getTableGateway()->getAdapter()->tableFactory(
-                    strval($parentTableName)
-                );
-            } catch (ServiceNotFoundException $e) {
-                // Create table instance from uniqueid in $value
-                /** @var AbstractRugaRow $row */
-                $row = $this->rowGateway->getTableGateway()->getAdapter()->rowFactory(
-                    is_array($value) ? $value[0] : $value
-                );
-                /** @var AbstractRugaTable $parentTable */
-                $parentTable = $row->getTableGateway();
+            [$parentTable, $parentKeyName, $parentRows] = $this->parseArg($arg1, $value);
+            
+            if((count($parentRows) == 0) && ($value == 'new')) {
+                $parentRowData = $this->postPopulateRowData[get_class($parentTable)] ?? [];
+                $this->createParentRow($parentTable, $parentRowData);
             }
             
-            // Find dependent rows
-            if (empty($parentKeyName)) {
-                $parentRows = $parentTable->findById($value);
-            } else {
-                $parentRows = $parentTable->select([$parentKeyName => $value]);
-            }
-            
-            if ($parentRows->count() > 0) {
-                // Link dependent rows
-                /** @var AbstractRugaRow $parentRow */
-                foreach ($parentRows as $parentRow) {
-                    $this->rowGateway->linkParentRow($parentRow);
-                }
-            } elseif ($value == 'new') {
-                // No dependent rows found, but new row is requested
-                $parentRow = $parentTable->createRow($this->postPopulateRowData);
-                $this->rowGateway->linkParentRow($parentRow);
+            /** @var AbstractRugaRow $parentRow */
+            foreach ($parentRows as $parentRow) {
+                $this->linkParentRow($parentRow);
             }
         }
     }

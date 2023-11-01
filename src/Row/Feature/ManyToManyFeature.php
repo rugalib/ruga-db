@@ -35,6 +35,8 @@ use Ruga\Db\Table\TableInterface;
  */
 class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttributesInterface
 {
+    use ParseStringArgTrait;
+    
     private ?MetadataFeature $metadataFeature = null;
     private $manyToManyRows = [];
     private array $postPopulateRowData = [];
@@ -882,65 +884,6 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     
     
     /**
-     * Parse the given argument and return table, column and rows.
-     *
-     * @param string            $arg
-     * @param null|string|array $value
-     *
-     * @return array
-     */
-    private function parseArg(string $arg, $value = null)
-    {
-        /** @var AbstractRugaTable $table */
-        $table = null;
-        /** @var string $column */
-        $column = null;
-        /** @var ResultSetInterface $rows */
-        $rows = null;
-        
-        $tableName = $arg;
-        
-        // Check, if value (after '=') is given in argument
-        // in this case, the actual $value is overwritten
-        if (strpos($tableName, '=') !== false) {
-            [$tableName, $value] = preg_split('/\s*=\s*/', $tableName, 2);
-        }
-        
-        // Check, if column name (after ':') is given in argument
-        if (strpos($tableName, ':') !== false) {
-            [$tableName, $column] = preg_split('/\s*:\s*/', $tableName, 2);
-        }
-        
-        // Try to resolve the remaining string in $tableName to a table
-        try {
-            $table = $this->rowGateway->getTableGateway()->getAdapter()->tableFactory($tableName);
-        } catch (ServiceNotFoundException $e) {
-            // Table not found, try to resolve to a row by assuming it's a uniqueid
-            if (!$row = $this->rowGateway->getTableGateway()->getAdapter()->rowFactory($tableName)) {
-                // Row not found, try to resolve to a row by assuming there is a uniqueid in $value
-                if (!$row = $this->rowGateway->getTableGateway()->getAdapter()->rowFactory($value)) {
-                    throw $e;
-                }
-            }
-            $table = $row->getTableGateway();
-            $value = $row->uniqueid;
-        }
-        
-        // populate the rows return value
-        if (!$rows) {
-            if (empty($column)) {
-                $rows = $table->findById($value);
-            } else {
-                $rows = $table->select([$column => $value]);
-            }
-        }
-        
-        return [$table, $column, $rows];
-    }
-    
-    
-    
-    /**
      * Link the entities given in parameters.
      *
      * @return void
@@ -965,13 +908,14 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             [$iTable, $iTableCol, $iRows] = $this->parseArg($arg2);
             [$mTable, $mTableCol, $mRows] = $this->parseArg($arg1, $value);
             
-            $mRowData = $this->postPopulateRowData[get_class($mTable)] ?? [];
             $iRowData = $this->postPopulateRowData[get_class($iTable)] ?? [];
             
             if ((count($mRows) == 0) && ($value == 'new')) {
+                $mRowData = $this->postPopulateRowData[get_class($mTable)] ?? [];
                 $this->createManyToManyRow($mTable, $iTable, $mRowData, $iRowData);
             }
             
+            /** @var AbstractRugaRow $mRow */
             foreach ($mRows as $mRow) {
                 $this->linkManyToManyRow($mRow, $iTable, $iRowData);
             }

@@ -309,11 +309,19 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $dependentTable = new \Ruga\Db\Test\Model\CartItemTable($this->getAdapter());
         /** @var CartItem $dependentRow */
         $dependentRow = $dependentTable->createRow([
-                                                       'fullname' => 'cart 2, item 7',
+                                                       'fullname' => 'This is a new item',
                                                        'seq' => 7,
                                                        $linkParamName => $linkParamValue,
-                                                       ]);
-        $dependentRow->save();
+                                                       CartTable::class => ['fullname' => 'This is a new cart'],
+                                                   ]);
+        
+        if ($linkParamValue == 'new') {
+            $parentRow = $dependentRow->findParentRow(CartTable::class);
+            $parentRow->save();
+        } else {
+            $dependentRow->save();
+        }
+        
         
         $items = $parentRow->findDependentRowset(CartItemTable::class);
         /** @var RowInterface $item */
@@ -330,15 +338,18 @@ class ChildFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     {
         return [
             '(FQCN)' => ['linkParentRow(\Ruga\Db\Test\Model\CartTable)', 2, 7],
-            ':FQCN' => ['linkParentRow():\Ruga\Db\Test\Model\CartTable', 2, 7],
-            ':FQCN:fullname' => ['linkParentRow():\Ruga\Db\Test\Model\CartTable:fullname', 'cart 2', 7],
-            '(FQCN):fullname' => ['linkParentRow(\Ruga\Db\Test\Model\CartTable):fullname', 'cart 2', 7],
+            '(FQCN=)' => ['linkParentRow(\Ruga\Db\Test\Model\CartTable=2)', null, 7],
             '(Alias)' => ['linkParentRow(CartTable)', 2, 7],
-            ':Alias' => ['linkParentRow():CartTable', 2, 7],
-            '(Alias):fullname' => ['linkParentRow(CartTable):fullname', 'cart 2', 7],
-            ':Alias:fullname' => ['linkParentRow():CartTable:fullname', 'cart 2', 7],
+            '(Alias=)' => ['linkParentRow(CartTable=2)', null, 7],
+            '(Alias=uniqueid)' => ['linkParentRow(CartTable=2@CartTable)', null, 7],
             '()=uniqueid' => ['linkParentRow()', '2@CartTable', 7],
-//            '(Alias)=new' => ['linkParentRow(CartTable)', 'new', 1],   // Not possible
+            '(uniqueid)' => ['linkParentRow(2@CartTable)', null, 7],
+            
+            '(FQCN:fullname)' => ['linkParentRow(\Ruga\Db\Test\Model\CartTable:fullname)', 'cart 2', 7],
+            '(Alias:fullname)' => ['linkParentRow(CartTable:fullname)', 'cart 2', 7],
+            '(Alias:fullname=)' => ['linkParentRow(CartTable:fullname=cart 2)', null, 7],
+            
+            '(Alias)=new' => ['linkParentRow(CartTable)', 'new', 1],
         ];
     }
     
