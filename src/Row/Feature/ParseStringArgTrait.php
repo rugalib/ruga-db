@@ -8,6 +8,7 @@ namespace Ruga\Db\Row\Feature;
 
 use Laminas\Db\ResultSet\ResultSetInterface;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
+use Ruga\Db\Row\RowInterface;
 use Ruga\Db\Table\AbstractRugaTable;
 
 trait ParseStringArgTrait
@@ -68,5 +69,4 @@ trait ParseStringArgTrait
         
         return [$table, $column, $rows];
     }
-    
 }

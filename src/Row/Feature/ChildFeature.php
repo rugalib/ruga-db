@@ -18,6 +18,7 @@ use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\ResultSet\ResultSet;
 use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
+use Ruga\Db\Row\Exception\InvalidColumnException;
 use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\NoDefaultValueException;
@@ -33,6 +34,7 @@ use Ruga\Db\Table\TableInterface;
 class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInterface
 {
     use ParseStringArgTrait;
+    use RowUniqueidTrait;
     
     private ?MetadataFeature $metadataFeature = null;
     private $parentRows = [];
@@ -151,9 +153,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
             return;
         }
         
-        $uniqueid = implode('-', $parentRow->primaryKeyData ?? []);
-        $uniqueid = empty($uniqueid) ? '?' . spl_object_hash($parentRow) : $uniqueid;
-        $uniqueid .= '@' . get_class($parentRow);
+        $uniqueid = $this->rowUniqueid($parentRow);
         
         // Only add row if it does not already exist in cache
         if (!array_key_exists($uniqueid, $this->parentRows[$constraintName] ?? [])) {
@@ -396,11 +396,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         $parentRow = $parentTable->createRow($rowData);
         // No foreign key yet!
         
-        // Add parent row to list
-        $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME'], 'save');
-        $this->addChildToParent($parentRow, $parentTableConstraint['NAME'], 'save');
-        
-        return $parentRow;
+        return $this->linkParentRow($parentRow, $parentTableConstraint['NAME']);
     }
     
     
@@ -419,6 +415,22 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         $parentTable = $this->resolveTableArgument($parentTable);
         $parentTableConstraint = $this->getParentTableConstraint($parentTable, $ruleKey);
         $parentRow = $this->unlinkParentRow($parentTable, $ruleKey);
+        
+        // Unset the parent from the child (for use by the application)
+        try {
+            $offset = "{$parentTableConstraint['NAME']}|{$this->rowUniqueid($parentRow)}";
+            $this->rowGateway->offsetUnset($offset);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($this->rowGateway));
+        }
+        
+        // Unset the child from the parent (for use by the application)
+        try {
+            $offset = "{$parentTableConstraint['NAME']}|{$this->rowUniqueid($this->rowGateway)}";
+            $parentRow->offsetUnset($offset);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($parentRow));
+        }
         
         // Add parent row to list
         $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME'], 'delete');
@@ -451,6 +463,22 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
             }
         }
         
+        // Present the parent to the child (for use by the application)
+        try {
+            $offset = "{$parentTableConstraint['NAME']}|{$this->rowUniqueid($parentRow)}";
+            $this->rowGateway->offsetSet($offset, $parentRow);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($this->rowGateway));
+        }
+        
+        // Present the child to the parent (for use by the application)
+        try {
+            $offset = "{$parentTableConstraint['NAME']}|{$this->rowUniqueid($this->rowGateway)}";
+            $parentRow->offsetSet($offset, $this->rowGateway);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($parentRow));
+        }
+        
         // Add parent row to list
         $this->parentRowListAdd($parentRow, $parentTableConstraint['NAME'], 'save');
         $this->addChildToParent($parentRow, $parentTableConstraint['NAME'], 'save');
@@ -480,6 +508,22 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
                 $column,
                 null
             );
+        }
+        
+        // Unset the parent from the child (for use by the application)
+        try {
+            $offset = "{$parentTableConstraint['NAME']}|{$this->rowUniqueid($parentRow)}";
+            $this->rowGateway->offsetUnset($offset);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($this->rowGateway));
+        }
+        
+        // Unset the child from the parent (for use by the application)
+        try {
+            $offset = "{$parentTableConstraint['NAME']}|{$this->rowUniqueid($this->rowGateway)}";
+            $parentRow->offsetUnset($offset);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($parentRow));
         }
         
         // Add parent row to list
@@ -540,7 +584,7 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
             
             [$parentTable, $parentKeyName, $parentRows] = $this->parseArg($arg1, $value);
             
-            if((count($parentRows) == 0) && ($value == 'new')) {
+            if ((count($parentRows) == 0) && ($value == 'new')) {
                 $parentRowData = $this->postPopulateRowData[get_class($parentTable)] ?? [];
                 $this->createParentRow($parentTable, $parentRowData);
             }
