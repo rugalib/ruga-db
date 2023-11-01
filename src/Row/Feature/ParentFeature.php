@@ -31,6 +31,8 @@ use Ruga\Db\Table\TableInterface;
  */
 class ParentFeature extends AbstractFeature implements ParentFeatureAttributesInterface
 {
+    use ParseStringArgTrait;
+    
     private ?MetadataFeature $metadataFeature = null;
     private $dependentRows = [];
     private array $postPopulateRowData = [];
@@ -589,50 +591,25 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
         foreach ($this->postPopulateLinks as $param => $value) {
             unset($this->postPopulateLinks[$param]);
             // Extract data from parameter name
-            [$dependentTableName, $dependentKeyName] = (function (string $param): array {
+            [$arg1, $arg2] = (function (string $param): array {
                 $m = null;
-                preg_match('/^linkDependentRow\(([a-zA-z_]*)\)(\:([a-zA-z_]*)(\:([a-zA-z_]*)|)|)$/', $param, $m);
-                if (empty($m[1] ?? null)) {
-                    return [$m[3] ?? null, $m[5] ?? null];
-                }
-                return [$m[1], $m[5] ?? $m[3] ?? null];
+                preg_match('/\(([^)]*)\)/', $param, $m);
+                $aArgs = preg_split('/\s*,\s*/', $m[1] ?? '');
+                return [$aArgs[0] ?? null, $aArgs[1] ?? null];
             })(
                 $param
             );
             
-            // Create table instance
-            try {
-                /** @var AbstractRugaTable $dependentTable */
-                $dependentTable = $this->rowGateway->getTableGateway()->getAdapter()->tableFactory(
-                    strval($dependentTableName)
-                );
-            } catch (ServiceNotFoundException $e) {
-                // Create table instance from uniqueid in $value
-                /** @var AbstractRugaRow $row */
-                $row = $this->rowGateway->getTableGateway()->getAdapter()->rowFactory(
-                    is_array($value) ? $value[0] : $value
-                );
-                /** @var AbstractRugaTable $dependentTable */
-                $dependentTable = $row->getTableGateway();
+            [$dependentTable, $dependentKeyName, $dependentRows] = $this->parseArg($arg1, $value);
+            
+            if((count($dependentRows) == 0) && ($value == 'new')) {
+                $dependentRowData = $this->postPopulateRowData[get_class($dependentTable)] ?? [];
+                $this->createDependentRow($dependentTable, $dependentRowData);
             }
             
-            // Find dependent rows
-            if (empty($dependentKeyName)) {
-                $dependentRows = $dependentTable->findById($value);
-            } else {
-                $dependentRows = $dependentTable->select([$dependentKeyName => $value]);
-            }
-            
-            if ($dependentRows->count() > 0) {
-                // Link dependent rows
-                /** @var AbstractRugaRow $dependentRow */
-                foreach ($dependentRows as $dependentRow) {
-                    $this->rowGateway->linkDependentRow($dependentRow);
-                }
-            } elseif ($value == 'new') {
-                // No dependent rows found, but new row is requested
-                $dependentRow = $dependentTable->createRow($this->postPopulateRowData);
-                $this->rowGateway->linkDependentRow($dependentRow);
+            /** @var AbstractRugaRow $dependentRow */
+            foreach($dependentRows as $dependentRow) {
+                $this->linkDependentRow($dependentRow);
             }
         }
     }

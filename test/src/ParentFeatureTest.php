@@ -667,7 +667,7 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
     public function testCanCreateRowWithLinkParam($linkParamName, $linkParamValue, $count)
     {
         $dependentTable = new \Ruga\Db\Test\Model\MusterTable($this->getAdapter());
-        $dependentRow = $dependentTable->createRow(['fullname' => 'Hallo Welt']);
+        $dependentRow = $dependentTable->createRow(['fullname' => 'This is a new row']);
         $dependentRow->save();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\Muster::class, $dependentRow);
         
@@ -675,13 +675,16 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         
         /** @var \Ruga\Db\Test\Model\MetaDefault $row */
         $row = $t->createRow([
-                                 'data' => 'data 8',
+                                 'data' => 'This is a new row',
                                  $linkParamName => $linkParamValue,
+                                 MusterTable::class => [
+                                     'fullname' => 'Created by \Ruga\Db\Row\Feature\ParentFeature::createDependentRow()',
+                                 ],
                              ]);
         $row->save();
         $this->assertInstanceOf(\Ruga\Db\Test\Model\MetaDefault::class, $row);
         $this->assertSame('8', "{$row->id}");
-        $this->assertSame('data 8', $row->data);
+        $this->assertSame('This is a new row', $row->data);
         
         $items = $row->findDependentRowset(MusterTable::class);
         /** @var RowInterface $item */
@@ -692,22 +695,21 @@ class ParentFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         $this->assertCount($count, $items);
     }
     
+    
+    
     public function linkParamProvider(): array
     {
         return [
             '(FQCN)' => ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', 2, 1],
             '(Alias)' => ['linkDependentRow(MusterTable)', 2, 1],
             '()=uniqueid' => ['linkDependentRow()', '2@MusterTable', 1],
-            '()=[uniqueid]' => ['linkDependentRow()', ['2@MusterTable', '1@MusterTable'], 2],
-            '(FQCN)=[id]' => ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', [1,2], 2],
-            ':FQCN' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', 2, 1],
-            ':FQCN=[id]' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', [2,1], 2],
-            ':FQCN:fullname' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable:fullname', 'Hallo Welt', 1],
-            ':FQCN:fullname=[]' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable:fullname', ['Hallo Welt','Linked to table Simple'], 2],
-            ':FQCN=new' => ['linkDependentRow():\Ruga\Db\Test\Model\MusterTable', 'new', 1],
+            '(Alias)=[uniqueid]' => ['linkDependentRow(MusterTable)', ['2@MusterTable', '1@MusterTable'], 2],
+            '(FQCN)=[id]' => ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', [1, 2], 2],
+            '(FQCN:fullname)' => ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable:fullname)', 'This is a new row', 1],
+            '(FQCN:fullname)=[]' => ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable:fullname)', ['This is a new row', 'Linked to table Simple'], 2,],
+            '(FQCN)=new' => ['linkDependentRow(\Ruga\Db\Test\Model\MusterTable)', 'new', 1],
         ];
     }
-    
     
     
 }
