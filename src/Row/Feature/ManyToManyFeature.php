@@ -21,6 +21,7 @@ use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\ResultSet\ResultSet;
 use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
+use Ruga\Db\Row\Exception\InvalidColumnException;
 use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\NoDefaultValueException;
@@ -36,6 +37,7 @@ use Ruga\Db\Table\TableInterface;
 class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttributesInterface
 {
     use ParseStringArgTrait;
+    use RowUniqueidTrait;
     
     private ?MetadataFeature $metadataFeature = null;
     private $manyToManyRows = [];
@@ -233,9 +235,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $iTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nConstraintName);
         $nConstraintName = $iTableConstraint['NAME'];
         
-        $iUniqueid = implode('-', $iRow->primaryKeyData ?? []);
-        $iUniqueid = empty($iUniqueid) ? '?' . spl_object_hash($iRow) : $iUniqueid;
-        $iUniqueid .= '@' . get_class($iRow);
+        $iUniqueid = $this->rowUniqueid($iRow);
         
         if (!array_key_exists($iUniqueid, $this->manyToManyRows[$nConstraintName] ?? [])) {
             $this->manyToManyRows[$nConstraintName][$iUniqueid]['uniqueid'] = $iUniqueid;
@@ -253,9 +253,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $mConstraintName = $mTableConstraint['NAME'];
         
         
-        $mUniqueid = implode('-', $mRow->primaryKeyData ?? []);
-        $mUniqueid = empty($mUniqueid) ? '?' . spl_object_hash($mRow) : $mUniqueid;
-        $mUniqueid .= '@' . get_class($mRow);
+        $mUniqueid = $this->rowUniqueid($mRow);
         
         if (!array_key_exists(
             $mUniqueid,
@@ -326,10 +324,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         $iTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nConstraintName);
         $nConstraintName = $iTableConstraint['NAME'];
         
-        $mRowUniqueid = implode('-', $mRow->primaryKeyData ?? []);
-        $mRowUniqueid = empty($mRowUniqueid) ? '?' . spl_object_hash($mRow) : $mRowUniqueid;
-        $mRowUniqueid .= '@' . get_class($mRow);
-        
+        $mRowUniqueid = $this->rowUniqueid($mRow);
         
         $a = [];
         foreach (($this->manyToManyRows[$nConstraintName] ?? []) as $iUniqueid => $iInfo) {
@@ -768,6 +763,36 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             }
         }
         
+        // Present the iRow to the nRow (for use by the application)
+        try {
+            $offset = "{$nTableConstraint['NAME']}|{$this->rowUniqueid($iRow)}";
+            $this->rowGateway->offsetSet($offset, $iRow);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($this->rowGateway));
+        }
+        // Present the nRow to the iRow (for use by the application)
+        try {
+            $offset = "{$nTableConstraint['NAME']}|{$this->rowUniqueid($this->rowGateway)}";
+            $iRow->offsetSet($offset, $this->rowGateway);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($iRow));
+        }
+        
+        // Present the iRow to the mRow (for use by the application)
+        try {
+            $offset = "{$mTableConstraint['NAME']}|{$this->rowUniqueid($iRow)}";
+            $mRow->offsetSet($offset, $iRow);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($mRow));
+        }
+        // Present the mRow to the iRow (for use by the application)
+        try {
+            $offset = "{$mTableConstraint['NAME']}|{$this->rowUniqueid($mRow)}";
+            $iRow->offsetSet($offset, $mRow);
+        } catch (InvalidColumnException $e) {
+            \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($iRow));
+        }
+        
         // Add dependent row to list for later saving
         $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME']);
         
@@ -820,6 +845,36 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
                 );
             }
             
+            // Unset the iRow from the nRow (for use by the application)
+            try {
+                $offset = "{$nTableConstraint['NAME']}|{$this->rowUniqueid($iRow)}";
+                $this->rowGateway->offsetUnset($offset);
+            } catch (InvalidColumnException $e) {
+                \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($this->rowGateway));
+            }
+            // Unset the nRow from the iRow (for use by the application)
+            try {
+                $offset = "{$nTableConstraint['NAME']}|{$this->rowUniqueid($this->rowGateway)}";
+                $iRow->offsetUnset($offset);
+            } catch (InvalidColumnException $e) {
+                \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($iRow));
+            }
+            
+            // Unset the iRow from the mRow (for use by the application)
+            try {
+                $offset = "{$mTableConstraint['NAME']}|{$this->rowUniqueid($iRow)}";
+                $mRow->offsetUnset($offset);
+            } catch (InvalidColumnException $e) {
+                \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($mRow));
+            }
+            // Unset the mRow from the iRow (for use by the application)
+            try {
+                $offset = "{$mTableConstraint['NAME']}|{$this->rowUniqueid($mRow)}";
+                $iRow->offsetUnset($offset);
+            } catch (InvalidColumnException $e) {
+                \Ruga\Log::addLog("Offset '{$offset}' is not valid in " . get_class($iRow));
+            }
+            
             $this->manyToManyRowListAdd($mRow, $iRow, $mTableConstraint['NAME'], $nTableConstraint['NAME'], $action);
         }
         
@@ -845,14 +900,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         ?string $mRuleKey = null,
         ?string $nRuleKey = null
     ): RowInterface {
-//        $nTable = $this->rowGateway->getTableGateway();
-//        $mTable = $this->resolveTableArgument($mRow);
-//        $iTable = $this->resolveTableArgument($iTable);
-//        $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mRuleKey);
-//        $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nRuleKey);
-        
         $this->unlinkManyToManyRow($mRow, $iTable, $mRuleKey, $nRuleKey, 'delete');
-        
         return $mRow;
     }
     
