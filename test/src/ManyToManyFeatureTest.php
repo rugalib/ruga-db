@@ -14,6 +14,7 @@ use Ruga\Db\Test\Model\Organization;
 use Ruga\Db\Test\Model\OrganizationTable;
 use Ruga\Db\Test\Model\PartyHasOrganization;
 use Ruga\Db\Test\Model\PartyHasOrganizationTable;
+use Ruga\Db\Test\Model\PartyTable;
 
 /**
  * @author Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
@@ -295,6 +296,102 @@ class ManyToManyFeatureTest extends \Ruga\Db\Test\PHPUnit\AbstractTestSetUp
         }
         
         $this->assertCount(1, $iRows);
+    }
+    
+    
+    
+    /**
+     * @dataProvider linkParamProvider
+     * @return void
+     * @throws \Exception
+     */
+    public function testCanLinkManyToManyRowWithLinkParam($linkParamName, $linkParamValue, $count)
+    {
+        $nTable = new \Ruga\Db\Test\Model\PartyTable($this->getAdapter());
+        /** @var \Ruga\Db\Test\Model\Party $nRow */
+        $nRow = $nTable->findById(1)->current();
+        $this->assertInstanceOf(\Ruga\Db\Test\Model\Party::class, $nRow);
+        
+        $mTable = new \Ruga\Db\Test\Model\OrganizationTable($this->getAdapter());
+        $mRow = $mTable->createRow(
+            [
+                'name' => 'This is a new organization',
+                $linkParamName => $linkParamValue,
+                PartyTable::class => [
+                    'fullname' => 'This is a new supplier',
+                    'party_role' => 'SUPPLIER',
+                ],
+                PartyHasOrganizationTable::class => [
+                    'remark' => 'new created link row',
+                ]
+            ]
+        );
+        
+        $mRow->save();
+        
+        $rowset = $mRow->findManyToManyRowset($nTable, PartyHasOrganizationTable::class);
+        $this->assertCount($count, $rowset);
+    }
+    
+    
+    
+    public function linkParamProvider(): array
+    {
+        return [
+            '(FQCN,FQCN)' => [
+                'linkManyToManyRow(\Ruga\Db\Test\Model\PartyTable, \Ruga\Db\Test\Model\PartyHasOrganizationTable)',
+                1,
+                1,
+            ],
+            '(Alias,Alias)' => ['linkManyToManyRow(PartyTable, PartyHasOrganizationTable)', 1, 1],
+            '(uniqueid,Alias)' => ['linkManyToManyRow(1@PartyTable, PartyHasOrganizationTable)', 17, 1],
+            '(Alias,Alias)=uniqueid' => ['linkManyToManyRow(PartyTable, PartyHasOrganizationTable)', '1@PartyTable', 1],
+            '(,Alias)=uniqueid' => ['linkManyToManyRow(, PartyHasOrganizationTable)', '1@PartyTable', 1],
+            
+            '(FQCN:fullname,Alias)' => [
+                'linkManyToManyRow(\Ruga\Db\Test\Model\PartyTable:fullname, PartyHasOrganizationTable)',
+                'Kaufmann AG',
+                1,
+            ],
+            '(Alias:fullname,Alias)' => [
+                'linkManyToManyRow(PartyTable:fullname, PartyHasOrganizationTable)',
+                'Kaufmann AG',
+                1,
+            ],
+            '(FQCN:fullname=,Alias)' => [
+                'linkManyToManyRow(\Ruga\Db\Test\Model\PartyTable:fullname=Kaufmann AG, PartyHasOrganizationTable)',
+                17,
+                1,
+            ],
+            '(Alias:fullname=,Alias)' => [
+                'linkManyToManyRow(PartyTable:fullname=Kaufmann AG, PartyHasOrganizationTable)',
+                17,
+                1,
+            ],
+            
+            '(FQCN,FQCN)=[]' => [
+                'linkManyToManyRow(\Ruga\Db\Test\Model\PartyTable, \Ruga\Db\Test\Model\PartyHasOrganizationTable)',
+                [1, 2],
+                2,
+            ],
+            '(Alias,Alias)=[]' => [
+                'linkManyToManyRow(\Ruga\Db\Test\Model\PartyTable, \Ruga\Db\Test\Model\PartyHasOrganizationTable)',
+                [1, 2],
+                2,
+            ],
+            '(Alias,Alias)=[uniqueid]' => [
+                'linkManyToManyRow(PartyTable, PartyHasOrganizationTable)',
+                ['1@PartyTable', '2@PartyTable'],
+                2,
+            ],
+            
+            '(FQCN,FQCN)=new' => [
+                'linkManyToManyRow(\Ruga\Db\Test\Model\PartyTable, \Ruga\Db\Test\Model\PartyHasOrganizationTable)',
+                'new',
+                1,
+            ],
+            '(Alias,Alias)=new' => ['linkManyToManyRow(PartyTable, PartyHasOrganizationTable)', 'new', 1],
+        ];
     }
     
     

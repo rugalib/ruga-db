@@ -21,6 +21,9 @@ return [
                 'CartTable' => \Ruga\Db\Test\Model\CartTable::class,
                 'CartItemTable' => \Ruga\Db\Test\Model\CartItemTable::class,
                 'MusterTable' => \Ruga\Db\Test\Model\MusterTable::class,
+                'PartyHasOrganizationTable' => \Ruga\Db\Test\Model\PartyHasOrganizationTable::class,
+                'OrganizationTable' => \Ruga\Db\Test\Model\OrganizationTable::class,
+                'PartyTable' => \Ruga\Db\Test\Model\PartyTable::class,
             ]
         ],
     ],

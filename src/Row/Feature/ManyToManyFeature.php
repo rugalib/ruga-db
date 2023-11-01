@@ -16,14 +16,17 @@ use Laminas\Db\Sql\ExpressionInterface;
 use Laminas\Db\Sql\Predicate\Predicate;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\Sql\Where;
+use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\ResultSet\ResultSet;
+use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\InvalidForeignKeyException;
 use Ruga\Db\Row\Exception\NoConstraintsException;
 use Ruga\Db\Row\Exception\NoDefaultValueException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
+use Ruga\Db\Table\AbstractRugaTable;
 use Ruga\Db\Table\Feature\MetadataFeature;
 use Ruga\Db\Table\TableInterface;
 
@@ -33,8 +36,9 @@ use Ruga\Db\Table\TableInterface;
 class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttributesInterface
 {
     private ?MetadataFeature $metadataFeature = null;
-    
     private $manyToManyRows = [];
+    private array $postPopulateRowData = [];
+    private array $postPopulateLinks = [];
     
     
     
@@ -849,5 +853,130 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         
         return $mRow;
     }
+    
+    
+    
+    /**
+     * Store the relevant parameters in this feature for postPopulate().
+     *
+     * @param array $rowData
+     * @param bool  $rowExistsInDatabase
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function prePopulate(array &$rowData, bool &$rowExistsInDatabase)
+    {
+        \Ruga\Log::functionHead($this);
+        
+        foreach ($rowData as $param => $value) {
+            if (strpos($param, 'linkManyToManyRow(') !== false) {
+                $this->postPopulateLinks[$param] = $value;
+                unset($rowData[$param]);
+            }
+        }
+        
+        $this->postPopulateRowData = &$rowData;
+    }
+    
+    
+    
+    /**
+     * Parse the given argument and return table, column and rows.
+     *
+     * @param string            $arg
+     * @param null|string|array $value
+     *
+     * @return array
+     */
+    private function parseArg(string $arg, $value = null)
+    {
+        /** @var AbstractRugaTable $table */
+        $table = null;
+        /** @var string $column */
+        $column = null;
+        /** @var ResultSetInterface $rows */
+        $rows = null;
+        
+        $tableName = $arg;
+        
+        // Check, if value (after '=') is given in argument
+        // in this case, the actual $value is overwritten
+        if (strpos($tableName, '=') !== false) {
+            [$tableName, $value] = preg_split('/\s*=\s*/', $tableName, 2);
+        }
+        
+        // Check, if column name (after ':') is given in argument
+        if (strpos($tableName, ':') !== false) {
+            [$tableName, $column] = preg_split('/\s*:\s*/', $tableName, 2);
+        }
+        
+        // Try to resolve the remaining string in $tableName to a table
+        try {
+            $table = $this->rowGateway->getTableGateway()->getAdapter()->tableFactory($tableName);
+        } catch (ServiceNotFoundException $e) {
+            // Table not found, try to resolve to a row by assuming it's a uniqueid
+            if (!$row = $this->rowGateway->getTableGateway()->getAdapter()->rowFactory($tableName)) {
+                // Row not found, try to resolve to a row by assuming there is a uniqueid in $value
+                if (!$row = $this->rowGateway->getTableGateway()->getAdapter()->rowFactory($value)) {
+                    throw $e;
+                }
+            }
+            $table = $row->getTableGateway();
+            $value = $row->uniqueid;
+        }
+        
+        // populate the rows return value
+        if (!$rows) {
+            if (empty($column)) {
+                $rows = $table->findById($value);
+            } else {
+                $rows = $table->select([$column => $value]);
+            }
+        }
+        
+        return [$table, $column, $rows];
+    }
+    
+    
+    
+    /**
+     * Link the entities given in parameters.
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function postPopulate()
+    {
+        \Ruga\Log::functionHead($this);
+        
+        foreach ($this->postPopulateLinks as $param => $value) {
+            unset($this->postPopulateLinks[$param]);
+            // Extract data from parameter name
+            [$arg1, $arg2] = (function (string $param): array {
+                $m = null;
+                preg_match('/\(([^)]*)\)/', $param, $m);
+                $aArgs = preg_split('/\s*,\s*/', $m[1] ?? '');
+                return [$aArgs[0] ?? null, $aArgs[1] ?? null];
+            })(
+                $param
+            );
+            
+            [$iTable, $iTableCol, $iRows] = $this->parseArg($arg2);
+            [$mTable, $mTableCol, $mRows] = $this->parseArg($arg1, $value);
+            
+            $mRowData = $this->postPopulateRowData[get_class($mTable)] ?? [];
+            $iRowData = $this->postPopulateRowData[get_class($iTable)] ?? [];
+            
+            if ((count($mRows) == 0) && ($value == 'new')) {
+                $this->createManyToManyRow($mTable, $iTable, $mRowData, $iRowData);
+            }
+            
+            foreach ($mRows as $mRow) {
+                $this->linkManyToManyRow($mRow, $iTable, $iRowData);
+            }
+        }
+    }
+    
     
 }
