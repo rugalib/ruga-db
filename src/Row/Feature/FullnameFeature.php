@@ -115,11 +115,11 @@ class FullnameFeature extends AbstractFeature implements FullnameFeatureAttribut
                 break;
             
             case 'idname':
-                return '[' . $this->PK . '] "' . $this->fullname . '"';
+                return "[{$this->PK}] \"{$this->fullname}\"";
                 break;
             
             case 'uniqueid':
-                return $this->PK . '@' . $this->type;
+                return (empty($this->PK) ? ('?'.spl_object_hash($this)) : $this->PK) . "@{$this->type}";
                 break;
             
             case 'type':
