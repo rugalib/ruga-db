@@ -531,8 +531,6 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      */
     public function prePopulate(array &$rowData, bool &$rowExistsInDatabase)
     {
-        \Ruga\Log::functionHead($this);
-        
         foreach ($rowData as $param => $value) {
             if (strpos($param, 'linkParentRow(') !== false) {
                 $this->postPopulateLinks[$param] = $value;
@@ -553,8 +551,6 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
      */
     public function postPopulate()
     {
-        \Ruga\Log::functionHead($this);
-        
         foreach ($this->postPopulateLinks as $param => $value) {
             unset($this->postPopulateLinks[$param]);
             // Extract data from parameter name

@@ -22,8 +22,6 @@ class DefaultValueFeature extends AbstractFeature
      */
     public function prePopulate(array &$rowData, bool &$rowExistsInDatabase)
     {
-//        \Ruga\Log::functionHead($this);
-        
         $table = $this->rowGateway->getTableGateway();
         $metadataFeature = $table->getFeatureSet()->getFeatureByClassName(MetadataFeature::class);
         if (!$metadataFeature || !($metadataFeature instanceof MetadataFeature)) {
