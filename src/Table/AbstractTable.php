@@ -22,6 +22,7 @@ use Laminas\Db\TableGateway\TableGateway;
 use Ruga\Db\ResultSet\ResultSet;
 use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\RowInterface;
+use Ruga\Db\Table\Exception\InvalidArgumentException;
 use Ruga\Db\Table\Feature\RowGatewayFeature;
 
 /**
@@ -265,24 +266,32 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
      * If primary key is a compound key, you have to give an array of arrays
      * with the exact number of values as the key components.
      *
-     * @param int|string|RowInterface|array $id
+     * @param int|string|RowInterface|array $searchId
      *
      * @return ResultSet
      * @throws \Exception
      */
-    public function findById($id): ResultSetInterface
+    public function findById($searchId): ResultSetInterface
     {
         // Leave with empty result, if empty $id given
-        if (empty($id)) {
+        if (empty($searchId)) {
             return $this->select("1=2");
         }
         
         // Create array if no array given
-        if (!is_array($id)) {
-            $id = [$id];
+        if (!is_array($searchId)) {
+            $searchId = [$searchId];
         }
+
+//        $shortClassName = (new \ReflectionClass($this))->getShortName();
+        // Find all class names until the first abstact class
+        $shortClassNames = [];
+        $class = new \ReflectionClass($this);
+        do {
+            $shortClassNames[] = $class->getShortName();
+        } while (($class = $class->getParentClass()) && !$class->isAbstract());
         
-        $shortClassName = (new \ReflectionClass($this))->getShortName();
+        
         $isUniqueid = null;
         /**
          * Parse the given key. Checks if object or uniqueid or plain.
@@ -291,14 +300,14 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
          *
          * @return false|mixed|string[]|null
          */
-        $isUniqueid = function ($uniquid) use ($shortClassName, &$isUniqueid) {
+        $isUniqueid = function ($uniquid) use ($shortClassNames, &$isUniqueid) {
             $matches = null;
             if (is_object($uniquid) && ($uniquid instanceof RowInterface)) {
                 // RowInterface object given: check if class matches and return primary key data
                 // If multi key, return an array
                 /** @var AbstractRow $uniquid */
                 $shortClassNameOfId = (new \ReflectionClass($uniquid->getTableGateway()))->getShortName();
-                if ($shortClassNameOfId != $shortClassName) {
+                if (!in_array($shortClassNameOfId, $shortClassNames)) {
                     return null;
                 }
                 $pk = array_values($uniquid->getPrimaryKeyData());
@@ -306,7 +315,7 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
             } elseif (is_string($uniquid) && (preg_match('/^([\w\-]+)@([A-Z]\w*)$/', $uniquid, $matches) === 1)) {
                 // uniqueid given: check if class matches and return primary key data
                 // If multi key, return an array
-                if ($matches[2] != $shortClassName) {
+                if (!in_array($matches[2], $shortClassNames)) {
                     return null;
                 }
                 return strpos($matches[1], '-') ? explode('-', $matches[1]) : $matches[1];
@@ -316,50 +325,54 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
             }
         };
         
-        // create sql
-        $str = '(' . implode(
-                ', ',
-                array_map(
-                    function (string $pk_name) {
-                        return $this->adapter->getPlatform()->quoteIdentifier($pk_name);
-                    },
-                    static::PRIMARYKEY
-                )
-            ) . ')';
-        $str .= ' IN ';
-        // IN does evaluate the values based on the type of the left-hand-side expression.
+        // array of column names
+        $aCols = array_map(
+            function (string $pk_name) {
+                return $this->adapter->getPlatform()->quoteIdentifier($pk_name);
+            },
+            static::PRIMARYKEY
+        );
         
-        $str .= '(' . implode(
-                ', ',
-                array_filter(
-                    array_map(
-                        function ($val) use ($isUniqueid) {
-                            $val = $isUniqueid($val);
-                            if ($val === null) {
-                                return null;
-                            } elseif (is_array($val)) {
-                                $numberOfValues = count($val);
-                                $val = '(' . $this->adapter->getPlatform()->quoteValueList($val) . ')';
-                            } else {
-                                $numberOfValues = 1;
+        // array of values
+        $aVals = array_filter(
+            array_map(
+                function ($val) use ($isUniqueid) {
+                    $val = $isUniqueid($val);
+                    if ($val === null) {
+                        return null;
+                    } elseif (is_array($val)) {
+                        $numberOfValues = count($val);
+                        $val = '(' . $this->adapter->getPlatform()->quoteValueList($val) . ')';
+                    } else {
+                        $numberOfValues = 1;
 //                                if ($val = $isUniqueid($val)) {
-                                $val = $this->adapter->getPlatform()->quoteValue($val);
+                        $val = $this->adapter->getPlatform()->quoteValue($val);
 //                                }
-                            }
-                            if ($numberOfValues != count(static::PRIMARYKEY)) {
-                                throw new Exception\InvalidArgumentException(
-                                    "Number of values given ({$numberOfValues}) does not match number of primary keys (" . implode(
-                                        ', ',
-                                        static::PRIMARYKEY
-                                    ) . ")"
-                                );
-                            }
-                            return $val;
-                        },
-                        $id
-                    )
-                )
-            ) . ')';
+                    }
+                    if ($numberOfValues != count(static::PRIMARYKEY)) {
+                        throw new Exception\InvalidArgumentException(
+                            "Number of values given ({$numberOfValues}) does not match number of primary keys (" . implode(
+                                ', ',
+                                static::PRIMARYKEY
+                            ) . ")"
+                        );
+                    }
+                    return $val;
+                },
+                $searchId
+            )
+        );
+        
+        
+        // create sql
+        $str = '(' . implode(', ', $aCols) . ')';
+        $str .= ' IN ';
+        $str .= '(' . implode(', ', $aVals) . ')';
+        
+        // return empty result set if one of the array is empty
+        if (empty($aCols) || empty($aVals)) {
+            throw new InvalidArgumentException("\$searchId does not match this table");
+        }
 
 //        \Ruga\Log::log_msg("\$sql={$str}");
         
@@ -433,6 +446,22 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
                 }
             }
         );
+    }
+    
+    
+    
+    /**
+     * @throws \Throwable
+     */
+    protected function executeSelect(Select $select): ResultSetInterface
+    {
+        try {
+            return parent::executeSelect($select);
+        } catch (\Throwable $exception) {
+            $sql = $select->getSqlString($this->getAdapter()->getPlatform());
+            \Ruga\Log::addLog("SQL: '{$sql}'", \Ruga\Log\Severity::DEBUG, \Ruga\Log\Type::EXCEPTION);
+            throw($exception);
+        }
     }
     
     
