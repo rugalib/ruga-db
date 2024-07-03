@@ -1,6 +1,6 @@
 <?php
 /*
- * SPDX-FileCopyrightText: 2023 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
+ * SPDX-FileCopyrightText: 2024 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -22,7 +22,7 @@ use Ruga\Db\Table\TableManager;
  * Class Adapter
  *
  * @author   Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
- * @see     AdapterFactory
+ * @see      AdapterFactory
  */
 class Adapter extends \Laminas\Db\Adapter\Adapter implements AdapterInterface
 {
@@ -58,7 +58,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter implements AdapterInterface
      */
     public function tableFactory($table): TableInterface
     {
-        \Ruga\Log::functionHead($this);
+//        \Ruga\Log::functionHead($this);
         if (!$this->tableManager) {
             throw new TableManagerMissingException("No table manager provided to the adapter");
         }
@@ -81,7 +81,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter implements AdapterInterface
      */
     public function rowFactory($id, $ref_table = null)/*: ?RowInterface*/
     {
-        \Ruga\Log::functionHead($this);
+//        \Ruga\Log::functionHead($this);
         
         if (empty($id)) {
             // no id given => return null
@@ -125,6 +125,19 @@ class Adapter extends \Laminas\Db\Adapter\Adapter implements AdapterInterface
     
     
     
+    /**
+     * Executes a query using the specified SQL statement, parameters or query mode, and result prototype.
+     *
+     * @param string                                        $sql                   The SQL statement to execute.
+     * @param int|string|array|null                         $parametersOrQueryMode The parameters or query mode to use.
+     *                                                                             Defaults to
+     *                                                                             \Laminas\Db\Adapter\Adapter::QUERY_MODE_PREPARE.
+     * @param \Laminas\Db\ResultSet\ResultSetInterface|null $resultPrototype       The result prototype to use.
+     *                                                                             Defaults to null.
+     *
+     * @return mixed The result of the query execution.
+     * @throws QueryRuntimeException If an error occurs while executing the query.
+     */
     public function query(
         $sql,
         $parametersOrQueryMode = \Laminas\Db\Adapter\Adapter::QUERY_MODE_PREPARE,

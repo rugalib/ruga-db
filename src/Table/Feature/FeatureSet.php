@@ -1,6 +1,6 @@
 <?php
 /*
- * SPDX-FileCopyrightText: 2023 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
+ * SPDX-FileCopyrightText: 2024 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -61,7 +61,7 @@ class FeatureSet extends \Laminas\Db\TableGateway\Feature\FeatureSet
     {
         if ($this->getFeatureByClassName(get_class($feature))) {
             $caller = debug_backtrace()[1]['class'] ?? '';
-            \Ruga\Log::addLog("Feature " . get_class($feature) . " already exists in $caller");
+//            \Ruga\Log::addLog("Feature " . get_class($feature) . " already exists in $caller");
             return $this;
         }
         return parent::addFeature($feature);

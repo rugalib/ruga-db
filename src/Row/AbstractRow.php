@@ -1,6 +1,6 @@
 <?php
 /*
- * SPDX-FileCopyrightText: 2023 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
+ * SPDX-FileCopyrightText: 2024 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -73,7 +73,7 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
      */
     public function save()
     {
-        \Ruga\Log::functionHead($this);
+//        \Ruga\Log::functionHead($this);
         $rowExistsInDatabase = null;
         try {
             $this->featureSet->apply('startSave', []);
@@ -267,6 +267,21 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
     
     
     /**
+     * Converts the object into a PHP array. Only returns the attributes of the object.
+     *
+     * @return array The converted native PHP array.
+     * @throws \Exception
+     */
+    public function toArrayNative(): array {
+        $aB = parent::toArray();
+        foreach ($aB as $name => $val) {
+            $aB[$name] = $this->offsetGet($name);
+        }
+        return $aB;
+    }
+    
+    
+    /**
      * Create an array representation of the data in the row.
      *
      * @inheritDoc
@@ -281,16 +296,54 @@ abstract class AbstractRow extends RowGateway implements RowAttributesInterface,
         // Get the native row data
         // Not using the values here, because parent::toArray() simply copies the $data array.
         // We want to retrieve data using self::offsetGet().
-        $aB = parent::toArray();
-        foreach ($aB as $name => $val) {
-            $aB[$name] = $this->offsetGet($name);
-        }
-        $dataarray = array_merge($dataarray, $aB);
+        $dataarray = array_merge($dataarray, $this->toArrayNative());
         
         $this->featureSet->apply('postToArray', [&$dataarray]);
         
         return $dataarray;
     }
+    
+    
+    public function toArrayRecursive(array $constraint, bool $recursive = true): array
+    {
+        $table = $this->rowGateway->getTableGateway();
+        
+        if (empty($constraint['REF_TABLE']) && empty($constraint['REF_TABLE_CLASS'])) {
+            return [];
+        }
+        if (!empty($constraint['TABLE']) && ($constraint['TABLE'] != $table->getTable())) {
+            return [];
+        }
+        if (!empty($constraint['TABLE_CLASS']) && ($constraint['TABLE_CLASS'] != get_class($table))) {
+            return [];
+        }
+        $parentTable = $this->resolveTableArgument(
+            $constraint['REF_TABLE'] ?? $constraint['REF_TABLE_CLASS']
+        );
+        
+        $constraint['SELECT'] = $constraint['SELECT'] ?? null;
+//            $resolvedParentConstraint = $this->getParentTableConstraint($parentTable, $parentConstraint['NAME']);
+        /** @var AbstractRow $parentRow */
+        $parentRow = $this->findParentRow($parentTable, $parentConstraint['NAME'], $parentConstraint['SELECT']);
+        if (!$parentRow) {
+            return [];
+        }
+        $prefix = implode('-', $parentConstraint['COLUMNS']);
+        $a = [];
+        if (self::$nestingLevel < 1) {
+            self::$nestingLevel++;
+            $a = $parentRow->toArray();
+            self::$nestingLevel--;
+        }
+        
+        $newKeys = array_map(function ($key) use ($prefix) {
+            return "{$prefix}.{$key}";
+        }, array_keys($a));
+        $a = array_combine($newKeys, array_values($a));
+//        $dataarray = array_merge($dataarray, $a);
+        return $a;
+    }
+    
     
     
     

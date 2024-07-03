@@ -1,6 +1,6 @@
 <?php
 /*
- * SPDX-FileCopyrightText: 2023 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
+ * SPDX-FileCopyrightText: 2024 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -59,10 +59,8 @@ abstract class AbstractTable extends TableGateway implements TableAttributesInte
      */
     const REFERENCEMAP = [];
     
-    /**
-     * Tables, which hold relations to this table.
-     */
-    const DEPENDENTTABLES = [];
+
+    static array $blockRecursion=[];
     
     /**
      * Stores the name of the schema.

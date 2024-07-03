@@ -1,6 +1,6 @@
 <?php
 /*
- * SPDX-FileCopyrightText: 2023 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
+ * SPDX-FileCopyrightText: 2024 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -16,6 +16,7 @@ use Laminas\Db\Sql\Where;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\ResultSet\ResultSet;
+use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\InvalidColumnException;
@@ -29,7 +30,7 @@ use Ruga\Db\Table\Feature\MetadataFeature;
 use Ruga\Db\Table\TableInterface;
 
 /**
- * The parent feature adds the ability to find, add and remove children
+ * The child feature adds the ability to find, add and remove parents
  */
 class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInterface
 {
@@ -40,6 +41,8 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
     private $parentRows = [];
     private array $postPopulateRowData = [];
     private array $postPopulateLinks = [];
+    
+    static int $nestingLevel = 0;
     
     
     
@@ -364,10 +367,10 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
             $select->where->addPredicate($existingWhere);
         }
         
-        \Ruga\Log::addLog(
-            "SQL={$select->getSqlString($parentTable->getAdapter()->getPlatform())}",
-            \Ruga\Log\Severity::DEBUG
-        );
+//        \Ruga\Log::addLog(
+//            "SQL={$select->getSqlString($parentTable->getAdapter()->getPlatform())}",
+//            \Ruga\Log\Severity::DEBUG
+//        );
         $parentRow = $parentTable->selectWith($select)->current();
         
         // Add parent row to list
@@ -577,5 +580,105 @@ class ChildFeature extends AbstractFeature implements ChildFeatureAttributesInte
         }
     }
     
+    
+    
+    public function toArrayParent(
+        $parentTable,
+        ?string $ruleKey = null,
+        ?Select $select = null,
+        bool $recursive = true
+    ): array {
+        $dependentRow = $this->rowGateway;
+        $table = $dependentRow->getTableGateway();
+        $parentTable = $this->resolveTableArgument($parentTable);
+        try {
+            $constraint = $this->getParentTableConstraint($parentTable, $ruleKey);
+        } catch (NoConstraintsException $exception) {
+        }
+        
+        if (empty($constraint['REF_TABLE']) && empty($constraint['REF_TABLE_CLASS'])) {
+            return [];
+        }
+        if (!empty($constraint['TABLE']) && ($constraint['TABLE'] != $table->getTable())) {
+            return [];
+        }
+        if (!empty($constraint['TABLE_CLASS']) && ($constraint['TABLE_CLASS'] != get_class($table))) {
+            return [];
+        }
+        
+        $constraint['SELECT'] = $constraint['SELECT'] ?? null;
+        /** @var AbstractRow $parentRow */
+        $parentRow = $this->findParentRow($parentTable, $constraint['NAME'], $constraint['SELECT']);
+        if (!$parentRow) {
+            return [];
+        }
+        $prefix = implode('-', $constraint['COLUMNS']);
+        $a = [];
+        if ((self::$nestingLevel < 10) && $recursive) {
+            self::$nestingLevel++;
+            $a = $parentRow->toArray();
+            self::$nestingLevel--;
+        }
+        $a["linkDependentRow(" . get_class($dependentRow) . ":{$prefix})"] = $dependentRow->isNew() ? 'new' : $dependentRow->uniqueid;
+        $newKeys = array_map(function ($key) use ($prefix) {
+            return implode('.' , array_filter([$prefix, $key]));
+        }, array_keys($a));
+        $a = array_combine($newKeys, array_values($a));
+//        $dataarray = array_merge($dataarray, $a);
+        return $a;
+    }
+    
+    
+    
+    public function postToArray(array &$dataarray)
+    {
+        return;
+        
+        $table = $this->rowGateway->getTableGateway();
+        
+        $m = $table->getMetadata();
+        $aConstraints = $m['constraints'];
+//        $aConstraints = $table::REFERENCEMAP ?? [];
+        
+        foreach ($aConstraints as $constraintName => $parentConstraint) {
+            $parentConstraint['NAME'] = $parentConstraint['NAME'] ?? $constraintName;
+            $dataarray = array_merge($dataarray, $this->toArrayRecursive($parentConstraint, true));
+            continue;
+            
+            if (empty($parentConstraint['REF_TABLE']) && empty($parentConstraint['REF_TABLE_CLASS'])) {
+                continue;
+            }
+            if (!empty($parentConstraint['TABLE']) && ($parentConstraint['TABLE'] != $table->getTable())) {
+                continue;
+            }
+            if (!empty($parentConstraint['TABLE_CLASS']) && ($parentConstraint['TABLE_CLASS'] != get_class($table))) {
+                continue;
+            }
+            $parentTable = $this->resolveTableArgument(
+                $parentConstraint['REF_TABLE'] ?? $parentConstraint['REF_TABLE_CLASS']
+            );
+            $parentConstraint['NAME'] = $parentConstraint['NAME'] ?? $constraintName;
+            $parentConstraint['SELECT'] = $parentConstraint['SELECT'] ?? null;
+//            $resolvedParentConstraint = $this->getParentTableConstraint($parentTable, $parentConstraint['NAME']);
+            /** @var AbstractRow $parentRow */
+            $parentRow = $this->findParentRow($parentTable, $parentConstraint['NAME'], $parentConstraint['SELECT']);
+            if (!$parentRow) {
+                continue;
+            }
+            $prefix = implode('-', $parentConstraint['COLUMNS']);
+            $a = [];
+            if (self::$nestingLevel < 1) {
+                self::$nestingLevel++;
+                $a = $parentRow->toArray();
+                self::$nestingLevel--;
+            }
+            
+            $newKeys = array_map(function ($key) use ($prefix) {
+                return "{$prefix}.{$key}";
+            }, array_keys($a));
+            $a = array_combine($newKeys, array_values($a));
+            $dataarray = array_merge($dataarray, $a);
+        }
+    }
     
 }

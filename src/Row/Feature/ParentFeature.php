@@ -1,6 +1,6 @@
 <?php
 /*
- * SPDX-FileCopyrightText: 2023 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
+ * SPDX-FileCopyrightText: 2024 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -16,6 +16,7 @@ use Laminas\Db\Sql\Where;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use ReflectionException;
 use Ruga\Db\Adapter\Adapter;
+use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\InvalidColumnException;
@@ -24,6 +25,7 @@ use Ruga\Db\Row\Exception\NoDefaultValueException;
 use Ruga\Db\Row\Exception\TooManyConstraintsException;
 use Ruga\Db\Row\RowInterface;
 use Ruga\Db\Table\AbstractRugaTable;
+use Ruga\Db\Table\AbstractTable;
 use Ruga\Db\Table\Feature\MetadataFeature;
 use Ruga\Db\Table\TableInterface;
 
@@ -39,6 +41,8 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
     private $dependentRows = [];
     private array $postPopulateRowData = [];
     private array $postPopulateLinks = [];
+    
+    static int $nestingLevel = 0;
     
     
     
@@ -113,7 +117,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      */
     public function preUpdate()
     {
-        \Ruga\Log::functionHead($this);
+//        \Ruga\Log::functionHead($this);
         $this->saveDependentRows();
     }
     
@@ -127,7 +131,7 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
      */
     public function postInsert()
     {
-        \Ruga\Log::functionHead($this);
+//        \Ruga\Log::functionHead($this);
         $this->saveDependentRows();
     }
     
@@ -387,10 +391,10 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             $select->where->addPredicate($existingWhere);
         }
         
-        \Ruga\Log::addLog(
-            "SQL={$select->getSqlString($dependentTable->getAdapter()->getPlatform())}",
-            \Ruga\Log\Severity::DEBUG
-        );
+//        \Ruga\Log::addLog(
+//            "SQL={$select->getSqlString($dependentTable->getAdapter()->getPlatform())}",
+//            \Ruga\Log\Severity::DEBUG
+//        );
         /** @var ResultSetInterface $rowset */
         $rowset = $dependentTable->selectWith($select);
 
@@ -620,4 +624,67 @@ class ParentFeature extends AbstractFeature implements ParentFeatureAttributesIn
             }
         }
     }
+    
+    
+    
+    public function toArrayDependent(
+        $dependentTable,
+        ?string $ruleKey = null,
+        ?Select $select = null,
+        ?callable $prefix = null,
+        bool $recursive = true
+    ): array {
+        $parentRow = $this->rowGateway;
+        $parentTable = $parentRow->getTableGateway();
+        $dependentTable = $this->resolveDependentTable($dependentTable);
+        $dependentConstraint = $this->getDependentTableConstraint($dependentTable, $ruleKey);
+        
+        if (empty($dependentConstraint['TABLE']) && empty($dependentConstraint['TABLE_CLASS'])) {
+            return [];
+        }
+//        if(in_array("createdBy", $constraint['COLUMNS'])) return [];
+//        if(in_array("changedBy", $constraint['COLUMNS'])) return [];
+        if (!empty($dependentConstraint['REF_TABLE']) && ($dependentConstraint['REF_TABLE'] != $parentTable->getTable(
+                ))) {
+            return [];
+        }
+        if (!empty($dependentConstraint['REF_TABLE_CLASS']) && ($dependentConstraint['REF_TABLE_CLASS'] != get_class(
+                    $parentTable
+                ))) {
+            return [];
+        }
+        $dependentConstraint['SELECT'] = $dependentConstraint['SELECT'] ?? null;
+        $dataarray = [];
+        $index = 0;
+        /** @var AbstractRow $dependentRow */
+        foreach (
+            $this->findDependentRowset(
+                $dependentTable,
+                $dependentConstraint['NAME'],
+                $dependentConstraint['SELECT']
+            ) as $dependentRow
+        ) {
+            if ($prefix === null) {
+                $prefix = "{$dependentConstraint['NAME']}.{$dependentRow->type}[{$index}]";
+            } else {
+                $prefix = $prefix($index, $dependentRow, $dependentConstraint, $parentRow);
+            }
+            
+            $a = [];
+            if ((self::$nestingLevel < 10) && $recursive) {
+                self::$nestingLevel++;
+                $a = $dependentRow->toArrayNative();
+                self::$nestingLevel--;
+            }
+            $a["linkParentRow(" . get_class($parentRow) . ":" . implode('-', $dependentConstraint['COLUMNS']) . ")"] = $parentRow->isNew() ? 'new' : $parentRow->uniqueid;
+            $newKeys = array_map(function ($key) use ($prefix) {
+                return implode('.', array_filter([$prefix, $key]));
+            }, array_keys($a));
+            $a = array_combine($newKeys, array_values($a));
+            $dataarray = array_merge($dataarray, $a);
+            $index++;
+        }
+        return $dataarray;
+    }
+    
 }

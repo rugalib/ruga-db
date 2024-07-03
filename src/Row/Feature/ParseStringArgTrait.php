@@ -29,8 +29,18 @@ trait ParseStringArgTrait
         $column = null;
         /** @var ResultSetInterface $rows */
         $rows = null;
+        /** @var string $ruleKey */
+        $ruleKey = null;
         
-        $tableName = $arg;
+        \Ruga\Log::addLog("parseArg('{$arg}')");
+        
+        // Extract rule key in parentheses
+        preg_match('/\(([^()]*)\)$/', $arg, $m);
+        if (isset($m[1])) {
+            $ruleKey = $m[1];
+        }
+        // Remove the parentheses
+        $tableName = preg_replace('/\([^()]*\)$/', '', $arg);
         
         // Check, if value (after '=') is given in argument
         // in this case, the actual $value is overwritten
@@ -67,6 +77,6 @@ trait ParseStringArgTrait
             }
         }
         
-        return [$table, $column, $rows];
+        return [$table, $column, $rows, $ruleKey];
     }
 }

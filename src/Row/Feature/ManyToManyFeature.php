@@ -1,6 +1,6 @@
 <?php
 /*
- * SPDX-FileCopyrightText: 2023 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
+ * SPDX-FileCopyrightText: 2024 Roland Rusch, easy-smart solution GmbH <roland.rusch@easy-smart.ch>
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Ruga\Db\Row\Feature;
 
 use Laminas\Db\Adapter\Driver\ResultInterface;
+use Laminas\Db\Adapter\Exception\InvalidQueryException;
 use Laminas\Db\ResultSet\ResultSetInterface;
 use Laminas\Db\RowGateway\RowGateway;
 use Laminas\Db\Sql\Expression;
@@ -19,6 +20,7 @@ use Laminas\Db\Sql\Where;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use Ruga\Db\Adapter\Adapter;
 use Ruga\Db\ResultSet\ResultSet;
+use Ruga\Db\Row\AbstractRow;
 use Ruga\Db\Row\AbstractRugaRow;
 use Ruga\Db\Row\Exception\FeatureMissingException;
 use Ruga\Db\Row\Exception\InvalidColumnException;
@@ -43,6 +45,8 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
     private $manyToManyRows = [];
     private array $postPopulateRowData = [];
     private array $postPopulateLinks = [];
+    
+    static int $nestingLevel = 0;
     
     
     
@@ -146,7 +150,10 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
                     } else {
                         throw new \RuntimeException('Parent row must be saved first');
                     }
-                    $iRow->save();
+                    try {
+                        $iRow->save();
+                    } catch (InvalidQueryException $exception) {
+                    }
                 }
                 if ($iRowInfo['action'] == 'unlink') {
                     $this->saveMRow($iRow, $iRowInfo['m']);
@@ -183,7 +190,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      */
     public function preUpdate()
     {
-        \Ruga\Log::functionHead($this);
+//        \Ruga\Log::functionHead($this);
         $this->saveIntersectionRow();
     }
     
@@ -197,7 +204,7 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
      */
     public function postInsert()
     {
-        \Ruga\Log::functionHead($this);
+//        \Ruga\Log::functionHead($this);
         $this->saveIntersectionRow();
     }
     
@@ -540,11 +547,11 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         if ($existingWhere->count() > 0) {
             $select->where->addPredicate($existingWhere);
         }
-        
-        \Ruga\Log::addLog(
-            "SQL={$select->getSqlString($mTable->getAdapter()->getPlatform())}",
-            \Ruga\Log\Severity::DEBUG
-        );
+
+//        \Ruga\Log::addLog(
+//            "SQL={$select->getSqlString($mTable->getAdapter()->getPlatform())}",
+//            \Ruga\Log\Severity::DEBUG
+//        );
         $mRowset = $mTable->selectWith($select);
         
         
@@ -644,11 +651,11 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
         if ($existingWhere->count() > 0) {
             $select->where->addPredicate($existingWhere);
         }
-        
-        \Ruga\Log::addLog(
-            "SQL={$select->getSqlString($iTable->getAdapter()->getPlatform())}",
-            \Ruga\Log\Severity::DEBUG
-        );
+
+//        \Ruga\Log::addLog(
+//            "SQL={$select->getSqlString($iTable->getAdapter()->getPlatform())}",
+//            \Ruga\Log\Severity::DEBUG
+//        );
         $iRowset = $iTable->selectWith($select);
         
         
@@ -942,29 +949,112 @@ class ManyToManyFeature extends AbstractFeature implements ManyToManyFeatureAttr
             // Extract data from parameter name
             [$arg1, $arg2] = (function (string $param): array {
                 $m = null;
-                preg_match('/\(([^)]*)\)/', $param, $m);
+                preg_match('/\(([^()]*?(?:\(.*?\))?[^()]*)\)/', $param, $m);
                 $aArgs = preg_split('/\s*,\s*/', $m[1] ?? '');
                 return [$aArgs[0] ?? null, $aArgs[1] ?? null];
             })(
                 $param
             );
             
-            [$iTable, $iTableCol, $iRows] = $this->parseArg($arg2);
-            [$mTable, $mTableCol, $mRows] = $this->parseArg($arg1, $value);
+            [$iTable, $iTableCol, $iRows, $nRuleKey] = $this->parseArg($arg2);
+            [$mTable, $mTableCol, $mRows, $mRuleKey] = $this->parseArg($arg1, $value);
             
             $iRowData = $this->postPopulateRowData[get_class($iTable)] ?? [];
             
             if ((count($mRows) == 0) && ($value == 'new')) {
                 $mRowData = $this->postPopulateRowData[get_class($mTable)] ?? [];
-                $this->createManyToManyRow($mTable, $iTable, $mRowData, $iRowData);
+                $this->createManyToManyRow($mTable, $iTable, $mRowData, $iRowData, $mRuleKey, $nRuleKey);
             }
             
             /** @var AbstractRugaRow $mRow */
             foreach ($mRows as $mRow) {
-                $this->linkManyToManyRow($mRow, $iTable, $iRowData);
+                $this->linkManyToManyRow($mRow, $iTable, $iRowData, $mRuleKey, $nRuleKey);
             }
         }
     }
     
     
+    
+    public function toArrayManyToMany(
+        $mTable,
+        $iTable,
+        ?string $nRuleKey = null,
+        ?string $mRuleKey = null,
+        ?Select $select = null,
+        ?callable $prefix = null,
+        bool $recursive = true
+    ): array {
+        $nTable = $this->rowGateway->getTableGateway();
+        $mTable = $this->resolveTableArgument($mTable);
+        $iTable = $this->resolveTableArgument($iTable);
+        $mTableConstraint = $this->getManyToManyTableConstraint($mTable, $iTable, $mRuleKey);
+        $nTableConstraint = $this->getManyToManyTableConstraint($nTable, $iTable, $nRuleKey);
+        $nRow = $this->rowGateway;
+        
+        $linkFieldName = "linkManyToManyRow("
+            . get_class($mTable)
+            . "({$mTableConstraint['NAME']})"
+//            . ":" . implode('-', $mTableConstraint['REF_COLUMNS'])
+            . ", " . get_class($iTable)
+//            . "({$mTableConstraint['NAME']})"
+            . ")";
+        $dataarray = [];
+        $dataarray[$linkFieldName] = [];
+        $index = 0;
+        /** @var AbstractRow $row */
+        foreach ($this->findManyToManyRowset($mTable, $iTable, $nRuleKey, $mRuleKey, $select) as $mRow) {
+            $dataarray[$linkFieldName][] = $mRow->uniqueid;
+            $iRowSet = $this->findIntersectionRows($mRow, $iTable, $nRuleKey, $mRuleKey, $select);
+            if (count($iRowSet) != 1) {
+                throw new \Exception("Intersection row count error");
+            };
+            /** @var RowInterface $iRow */
+            $iRow = $iRowSet->current();
+            if ($prefix === null) {
+                $iPrefix = "{$mTableConstraint['NAME']}.{$iRow->type}[{$index}]";
+                $mPrefix = "{$iPrefix}." . implode(
+                        '-',
+                        $mTableConstraint['COLUMNS']
+                    );
+            } else {
+                $prefixResult = $prefix($index, $mRow, $mTableConstraint, $nRow, $nTableConstraint, $iRow);
+                if (!is_array($prefixResult)) {
+                    $prefixResult = [$prefixResult];
+                }
+                $iPrefix = $prefixResult[0];
+                $mPrefix = $prefixResult[1] ?? "{$iPrefix}." . implode(
+                    '-',
+                    $mTableConstraint['COLUMNS']
+                );
+            }
+            
+            $iArray = [];
+            if ((self::$nestingLevel < 10) && $recursive) {
+                self::$nestingLevel++;
+                $iArray = $iRow->toArrayNative();
+                self::$nestingLevel--;
+            }
+            $newKeys = array_map(function ($key) use ($iPrefix) {
+                return implode('.', array_filter([$iPrefix, $key]));
+            }, array_keys($iArray));
+            $iArray = array_combine($newKeys, array_values($iArray));
+            
+            
+            $mArray = [];
+            if ((self::$nestingLevel < 10) && $recursive) {
+                self::$nestingLevel++;
+                $mArray = $mRow->toArray();
+                self::$nestingLevel--;
+            }
+            $mArray = array_merge($mArray, ['ruga_linkFieldName' => $linkFieldName]);
+            $newKeys = array_map(function ($key) use ($mPrefix) {
+                return implode('.', array_filter([$mPrefix, $key]));
+            }, array_keys($mArray));
+            $mArray = array_combine($newKeys, array_values($mArray));
+            
+            $dataarray = array_merge($dataarray, $iArray, $mArray);
+            $index++;
+        }
+        return $dataarray;
+    }
 }
